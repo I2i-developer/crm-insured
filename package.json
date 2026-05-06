@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.1",
-    "next-auth": "^4.24.14"
+    "next-auth": "^4.24.14",
+    "xlsx": "^0.18.5"
   }
 }
