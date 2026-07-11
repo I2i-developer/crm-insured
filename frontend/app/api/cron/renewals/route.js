@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { sendEmail } from '@/lib/sendgrid';
 import { sendSMS, sendWhatsApp } from '@/lib/twilio';
 
@@ -102,21 +102,17 @@ const sendOverdueAlert = async (policy) => {
 
 export async function GET(request) {
   try {
-    const authHeader = request.headers.get('authorization');
     const cronSecret = request.headers.get('x-cron-secret');
     const expectedSecret = process.env.CRON_SECRET;
 
-    if (expectedSecret && cronSecret !== expectedSecret) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (!authHeader && !cronSecret) {
-      return NextResponse.json({ error: 'No authorization provided' }, { status: 401 });
+    if (!expectedSecret || cronSecret !== expectedSecret) {
+      return NextResponse.json({ error: 'Unauthorized cron request' }, { status: 401 });
     }
 
     console.log(`[${new Date().toISOString()}] Starting daily renewal check...`);
 
-    const { data: policies, error } = await supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: policies, error } = await supabaseAdmin
       .from('policies')
       .select('*')
       .neq('status', 'Paid');
@@ -138,10 +134,11 @@ export async function GET(request) {
           await sendRenewalReminder(policy);
           reminderCount++;
 
-          await supabase
+          await supabaseAdmin
             .from('interaction_logs')
             .insert({
               policy_id: policy.id,
+              user_id: policy.user_id,
               remark: `T-30 reminder sent automatically via cron job`
             });
         }
@@ -151,15 +148,16 @@ export async function GET(request) {
           await sendOverdueAlert(policy);
           overdueCount++;
 
-          await supabase
+          await supabaseAdmin
             .from('policies')
             .update({ last_alert_sent_at: new Date().toISOString() })
             .eq('id', policy.id);
 
-          await supabase
+          await supabaseAdmin
             .from('interaction_logs')
             .insert({
               policy_id: policy.id,
+              user_id: policy.user_id,
               remark: `Overdue alert sent automatically via cron job`
             });
         }

@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
 export default function InteractionsPage() {
   const searchParams = useSearchParams();
+  const toast = useToast();
   const policyId = searchParams.get('policy');
 
   const [interactions, setInteractions] = useState([]);
@@ -15,7 +17,6 @@ export default function InteractionsPage() {
   const [selectedPolicy, setSelectedPolicy] = useState(policyId || '');
   const [newRemark, setNewRemark] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
@@ -42,6 +43,7 @@ export default function InteractionsPage() {
       }
     } catch (error) {
       console.error('Failed to fetch policies:', error);
+      toast.error('Failed to load policies.');
     }
   };
 
@@ -52,6 +54,7 @@ export default function InteractionsPage() {
       setInteractions(data.logs || []);
     } catch (error) {
       console.error('Failed to fetch interactions:', error);
+      toast.error('Failed to load interaction history.');
     } finally {
       setLoading(false);
     }
@@ -62,15 +65,13 @@ export default function InteractionsPage() {
     if (!selectedPolicy || !newRemark.trim()) return;
 
     setSubmitting(true);
-    setSubmitSuccess(false);
     try {
       await api.post('/interactions', { policy_id: selectedPolicy, remark: newRemark });
       setNewRemark('');
-      setSubmitSuccess(true);
+      toast.success('Remark added successfully.');
       fetchInteractions(selectedPolicy);
-      setTimeout(() => setSubmitSuccess(false), 3000);
     } catch (error) {
-      alert('Failed to add remark');
+      toast.error(error.message || 'Failed to add remark.');
     } finally {
       setSubmitting(false);
     }
@@ -88,9 +89,10 @@ export default function InteractionsPage() {
       await api.put(`/interactions/${logId}`, { remark: editText });
       setEditingId(null);
       setEditText('');
+      toast.success('Remark updated successfully.');
       fetchInteractions(selectedPolicy);
     } catch (error) {
-      alert('Failed to update remark');
+      toast.error(error.message || 'Failed to update remark.');
     } finally {
       setSavingEdit(false);
     }
@@ -102,12 +104,19 @@ export default function InteractionsPage() {
   };
 
   const handleDelete = async (logId) => {
-    if (!confirm('Are you sure you want to delete this remark?')) return;
+    const confirmed = await toast.confirm({
+      title: 'Delete remark?',
+      message: 'This communication note will be permanently removed.',
+      confirmLabel: 'Delete'
+    });
+    if (!confirmed) return;
+
     try {
       await api.delete(`/interactions/${logId}`);
+      toast.success('Remark deleted successfully.');
       fetchInteractions(selectedPolicy);
     } catch (error) {
-      alert('Failed to delete remark');
+      toast.error(error.message || 'Failed to delete remark.');
     }
   };
 
@@ -194,9 +203,6 @@ export default function InteractionsPage() {
             >
               {submitting ? 'Adding...' : 'Add Remark'}
             </button>
-            {submitSuccess && (
-              <span className={styles.successMsg}>Remark added successfully!</span>
-            )}
           </form>
         </div>
 

@@ -1,5 +1,6 @@
 import './globals.css';
 import { AuthProvider } from '@/lib/authContext';
+import { ToastProvider } from '@/components/ToastProvider';
 
 export const metadata = {
   title: 'Insurance Renewal Management Portal',
@@ -13,7 +14,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <ToastProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ToastProvider>
       </body>
     </html>
   );

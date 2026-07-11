@@ -1,25 +1,13 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function getUserIdFromRequest(request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded.userId;
-  } catch {
-    return null;
-  }
-}
+import { writeAuditLog } from '@/lib/audit';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { validatePolicyInput } from '@/lib/validation';
 
 export async function GET(request) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -34,9 +22,14 @@ export async function GET(request) {
     const sort_by = searchParams.get('sort_by') || 'due_date';
     const sort_order = searchParams.get('sort_order') || 'asc';
 
+    const supabaseAdmin = getSupabaseAdmin();
     let queryBuilder = supabaseAdmin
       .from('policies')
       .select('*', { count: 'exact' });
+
+    if (!isPrivilegedRole(auth.role)) {
+      queryBuilder = queryBuilder.eq('user_id', auth.userId);
+    }
 
     if (search) {
       queryBuilder = queryBuilder.ilike('client_name', `%${search}%`);
@@ -91,40 +84,22 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const {
-      client_name,
-      insurance_company,
-      policy_number,
-      premium_amount,
-      due_date,
-      issuance_date,
-      phone,
-      email,
-      status = 'Pending'
-    } = body;
-
-    if (!client_name || !insurance_company || !policy_number || !premium_amount || !due_date || !issuance_date) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    const { policy, errors } = validatePolicyInput(await request.json());
+    if (errors.length) {
+      return NextResponse.json({ error: errors.join(', ') }, { status: 400 });
     }
 
+    const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from('policies')
       .insert({
-        client_name,
-        insurance_company,
-        policy_number,
-        premium_amount: parseFloat(premium_amount),
-        due_date,
-        issuance_date,
-        phone: phone || null,
-        email: email || null,
-        status
+        ...policy,
+        user_id: auth.userId
       })
       .select()
       .single();
@@ -135,6 +110,14 @@ export async function POST(request) {
       }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await writeAuditLog(request, auth, {
+      action: 'policy.create',
+      entityType: 'policy',
+      entityId: data.id,
+      summary: `Created policy ${data.policy_number} for ${data.client_name}`,
+      metadata: { policy_number: data.policy_number, client_name: data.client_name }
+    });
 
     return NextResponse.json({ message: 'Policy created successfully', policy: data }, { status: 201 });
   } catch (error) {

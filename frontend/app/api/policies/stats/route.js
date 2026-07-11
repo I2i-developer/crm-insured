@@ -1,55 +1,41 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function getUserIdFromRequest(request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded.userId;
-  } catch {
-    return null;
-  }
-}
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
 
 export async function GET(request) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { count: totalCount } = await supabaseAdmin
-      .from('policies')
-      .select('id', { count: 'exact', head: true });
+    const supabaseAdmin = getSupabaseAdmin();
+    const baseCount = () => {
+      let query = supabaseAdmin
+        .from('policies')
+        .select('id', { count: 'exact', head: true });
 
-    const { count: pendingCount } = await supabaseAdmin
-      .from('policies')
-      .select('id', { count: 'exact', head: true })
+      if (!isPrivilegedRole(auth.role)) {
+        query = query.eq('user_id', auth.userId);
+      }
+
+      return query;
+    };
+
+    const { count: totalCount } = await baseCount();
+    const { count: pendingCount } = await baseCount()
       .eq('status', 'Pending');
 
-    const { count: paidCount } = await supabaseAdmin
-      .from('policies')
-      .select('id', { count: 'exact', head: true })
+    const { count: paidCount } = await baseCount()
       .eq('status', 'Paid');
 
-    const { count: overdueCount } = await supabaseAdmin
-      .from('policies')
-      .select('id', { count: 'exact', head: true })
+    const { count: overdueCount } = await baseCount()
       .eq('status', 'Overdue');
 
-    const { count: gracePeriodCount } = await supabaseAdmin
-      .from('policies')
-      .select('id', { count: 'exact', head: true })
+    const { count: gracePeriodCount } = await baseCount()
       .eq('status', 'Grace Period');
 
-    const { count: lapsedCount } = await supabaseAdmin
-      .from('policies')
-      .select('id', { count: 'exact', head: true })
+    const { count: lapsedCount } = await baseCount()
       .eq('status', 'Lapsed');
 
     return NextResponse.json({

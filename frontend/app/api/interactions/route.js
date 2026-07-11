@@ -1,34 +1,27 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function getUserIdFromRequest(request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded.userId;
-  } catch {
-    return null;
-  }
-}
+import { writeAuditLog } from '@/lib/audit';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { cleanString } from '@/lib/validation';
 
 export async function GET(request) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const policyId = searchParams.get('policy');
 
-    let queryBuilder = supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    let queryBuilder = supabaseAdmin
       .from('interaction_logs')
-      .select('*');
+      .select('*, policies!inner(user_id)');
+
+    if (!isPrivilegedRole(auth.role)) {
+      queryBuilder = queryBuilder.eq('policies.user_id', auth.userId);
+    }
 
     if (policyId) {
       queryBuilder = queryBuilder.eq('policy_id', policyId);
@@ -51,36 +44,51 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { policy_id, remark } = await request.json();
+    const cleanRemark = cleanString(remark, 2000);
 
-    if (!policy_id || !remark) {
+    if (!policy_id || !cleanRemark) {
       return NextResponse.json({ error: 'policy_id and remark are required' }, { status: 400 });
     }
 
-    const { data: policy } = await supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    let policyQuery = supabaseAdmin
       .from('policies')
       .select('id')
-      .eq('id', policy_id)
-      .single();
+      .eq('id', policy_id);
+
+    if (!isPrivilegedRole(auth.role)) {
+      policyQuery = policyQuery.eq('user_id', auth.userId);
+    }
+
+    const { data: policy } = await policyQuery.single();
 
     if (!policy) {
       return NextResponse.json({ error: 'Policy not found' }, { status: 404 });
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('interaction_logs')
-      .insert({ policy_id, remark })
+      .insert({ policy_id, user_id: auth.userId, remark: cleanRemark })
       .select()
       .single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await writeAuditLog(request, auth, {
+      action: 'interaction.create',
+      entityType: 'interaction',
+      entityId: data.id,
+      summary: 'Created policy interaction log',
+      metadata: { policy_id }
+    });
 
     return NextResponse.json({ message: 'Interaction log created', log: data }, { status: 201 });
   } catch (error) {

@@ -1,45 +1,47 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function getUserIdFromRequest(request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded.userId;
-  } catch {
-    return null;
-  }
-}
+import { writeAuditLog } from '@/lib/audit';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { cleanString } from '@/lib/validation';
 
 export async function PUT(request, { params }) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = params;
     const { remark } = await request.json();
+    const cleanRemark = cleanString(remark, 2000);
 
-    if (!remark || !remark.trim()) {
+    if (!cleanRemark) {
       return NextResponse.json({ error: 'Remark is required' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
       .from('interaction_logs')
-      .update({ remark: remark.trim() })
-      .eq('id', id)
-      .select()
-      .single();
+      .update({ remark: cleanRemark })
+      .eq('id', id);
+
+    if (!isPrivilegedRole(auth.role)) {
+      query = query.eq('user_id', auth.userId);
+    }
+
+    const { data, error } = await query.select().single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await writeAuditLog(request, auth, {
+      action: 'interaction.update',
+      entityType: 'interaction',
+      entityId: data.id,
+      summary: 'Updated policy interaction log',
+      metadata: { policy_id: data.policy_id }
+    });
 
     return NextResponse.json({ message: 'Interaction log updated', log: data });
   } catch (error) {
@@ -50,21 +52,36 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = params;
 
-    const { error } = await supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
       .from('interaction_logs')
       .delete()
       .eq('id', id);
 
+    if (!isPrivilegedRole(auth.role)) {
+      query = query.eq('user_id', auth.userId);
+    }
+
+    const { data, error } = await query.select('id, policy_id').single();
+
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await writeAuditLog(request, auth, {
+      action: 'interaction.delete',
+      entityType: 'interaction',
+      entityId: data.id,
+      summary: 'Deleted policy interaction log',
+      metadata: { policy_id: data.policy_id }
+    });
 
     return NextResponse.json({ message: 'Interaction log deleted successfully' });
   } catch (error) {

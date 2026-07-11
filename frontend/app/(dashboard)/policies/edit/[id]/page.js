@@ -3,52 +3,29 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import { HEALTH_INSURANCE_COMPANIES, HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
+import { useToast } from '@/components/ToastProvider';
 import styles from '../../new/page.module.css';
 
-const INDIAN_INSURANCE_COMPANIES = [
-  'HDFC Ergo',
-  'Niva Bupa',
-  'Manipal Cigna',
-  'ICICI Lombard',
-  'Care Health',
-  'Tata AIG',
-  'Life Insurance Corporation (LIC)',
-  'HDFC Life Insurance',
-  'ICICI Prudential Life Insurance',
-  'SBI Life Insurance',
-  'Max Life Insurance',
-  'Bajaj Allianz Life Insurance',
-  'Kotak Mahindra Life Insurance',
-  'Aditya Birla Sun Life Insurance',
-  'Tata AIA Life Insurance',
-  'PNB MetLife India Insurance',
-  'Aviva Life Insurance',
-  'Reliance Nippon Life Insurance',
-  'Ageas Federal Life Insurance',
-  'Canara HSBC Life Insurance',
-  'Shriram Life Insurance',
-  'Star Union Dai-ichi Life Insurance',
-  'Bharti AXA Life Insurance',
-  'Future Generali India Life Insurance',
-  'IDBI Federal Life Insurance',
-  'Aegon Life Insurance',
-  'Other'
-];
-
 const STATUS_OPTIONS = ['Pending', 'Paid', 'Overdue', 'Grace Period', 'Lapsed'];
+const OTHER_COMPANY = 'Other';
 
 export default function EditPolicyPage() {
   const router = useRouter();
   const params = useParams();
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
     client_name: '',
+    policy_type: HEALTH_POLICY_TYPE,
     insurance_company: '',
+    other_company: '',
     policy_number: '',
     premium_amount: '',
     due_date: '',
+    payment_due_date: '',
     issuance_date: '',
     phone: '',
     email: '',
@@ -63,12 +40,16 @@ export default function EditPolicyPage() {
     try {
       const data = await api.get(`/policies/${params.id}`);
       const policy = data.policy;
+      const knownCompany = HEALTH_INSURANCE_COMPANIES.includes(policy.insurance_company);
       setForm({
         client_name: policy.client_name,
-        insurance_company: policy.insurance_company,
+        policy_type: policy.policy_type || HEALTH_POLICY_TYPE,
+        insurance_company: knownCompany ? policy.insurance_company : OTHER_COMPANY,
+        other_company: knownCompany ? '' : policy.insurance_company,
         policy_number: policy.policy_number,
         premium_amount: policy.premium_amount,
         due_date: policy.due_date,
+        payment_due_date: policy.payment_due_date || '',
         issuance_date: policy.issuance_date,
         phone: policy.phone || '',
         email: policy.email || '',
@@ -76,6 +57,7 @@ export default function EditPolicyPage() {
       });
     } catch (err) {
       setError('Failed to load policy');
+      toast.error('Failed to load policy.');
     } finally {
       setLoading(false);
     }
@@ -83,7 +65,11 @@ export default function EditPolicyPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm(prev => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'insurance_company' && value !== OTHER_COMPANY ? { other_company: '' } : {})
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -94,13 +80,18 @@ export default function EditPolicyPage() {
     try {
       const payload = {
         ...form,
+        insurance_company: form.insurance_company === OTHER_COMPANY ? form.other_company : form.insurance_company,
         premium_amount: parseFloat(form.premium_amount)
       };
+      delete payload.other_company;
 
       await api.put(`/policies/${params.id}`, payload);
+      toast.success('Health policy updated successfully.');
       router.push('/policies');
     } catch (err) {
-      setError(err.message || 'Failed to update policy');
+      const message = err.message || 'Failed to update policy';
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -119,8 +110,8 @@ export default function EditPolicyPage() {
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <h1>Edit Policy</h1>
-        <p>Update policy details</p>
+        <h1>Edit Health Policy</h1>
+        <p>Update health policy details</p>
       </header>
 
       <form onSubmit={handleSubmit} className={styles.form}>
@@ -142,7 +133,28 @@ export default function EditPolicyPage() {
             <label>Insurance Company *</label>
             <select name="insurance_company" value={form.insurance_company} onChange={handleChange} required>
               <option value="">Select company</option>
-              {INDIAN_INSURANCE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {HEALTH_INSURANCE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {form.insurance_company === OTHER_COMPANY && (
+            <div className={styles.field}>
+              <label>Specify Company *</label>
+              <input
+                type="text"
+                name="other_company"
+                value={form.other_company}
+                onChange={handleChange}
+                required
+                placeholder="Enter company name"
+              />
+            </div>
+          )}
+
+          <div className={styles.field}>
+            <label>Policy Type</label>
+            <select name="policy_type" value={form.policy_type} onChange={handleChange}>
+              <option value={HEALTH_POLICY_TYPE}>{HEALTH_POLICY_TYPE}</option>
             </select>
           </div>
 
@@ -189,6 +201,16 @@ export default function EditPolicyPage() {
               value={form.issuance_date}
               onChange={handleChange}
               required
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label>Payment Due Date</label>
+            <input
+              type="date"
+              name="payment_due_date"
+              value={form.payment_due_date}
+              onChange={handleChange}
             />
           </div>
 

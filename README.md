@@ -1,6 +1,6 @@
 # Insurance Renewal Management Portal
 
-A complete production-ready insurance renewal management system built with Next.js 14.
+A hardened insurance renewal management system built with Next.js, Supabase, JWT authentication, and multi-channel renewal alerts.
 
 ## Features
 
@@ -19,21 +19,41 @@ A complete production-ready insurance renewal management system built with Next.
 
 1. Create a project at [supabase.com](https://supabase.com)
 2. Go to SQL Editor and run `database/schema.sql`
-3. Copy your project URL and keys
+3. Copy your project URL, anon key, and service role key
+
+If you already created the database from an older version of this project, review and run `database/migrate-secure-ownership.sql` instead. Existing policies must be assigned to a user before the migration can enforce ownership.
 
 ### 2. Environment Setup
 
 ```bash
-# In the root directory
-cp .env.example .env.local
+# In the frontend directory
+cd frontend
+copy .env.example .env.local
 
-# Edit .env.local with your Supabase credentials
+# Edit .env.local with your Supabase credentials and secrets
+```
+
+Required for local development:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_KEY`
+- `JWT_SECRET`
+- `CRON_SECRET`
+
+Generate strong secrets with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ### 3. Install & Run
 
 ```bash
 npm install
+cd frontend
+npm install
+cd ..
 npm run dev
 ```
 
@@ -45,10 +65,10 @@ npm run dev
 
 ## Tech Stack
 
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js (App Router)
 - **Database**: Supabase (PostgreSQL)
 - **Styling**: CSS Modules
-- **Auth**: JWT + bcrypt
+- **Auth**: JWT + scrypt password hashing
 - **SMS/WhatsApp**: Twilio (mock mode if not configured)
 - **Email**: SendGrid (mock mode if not configured)
 
@@ -107,7 +127,7 @@ All endpoints require JWT authentication (except `/api/auth/login` and `/api/aut
 
 ## Cron Job
 
-The cron job runs daily at 9:00 AM (set via external service like Vercel Cron or a system cron).
+The cron job runs daily at 9:00 AM (set via external service like Vercel Cron or a system cron). It requires the `x-cron-secret` header to match `CRON_SECRET`.
 
 It:
 1. Checks all unpaid policies
@@ -127,6 +147,12 @@ In `vercel.json`:
 }
 ```
 
+Configure your scheduler to send:
+
+```text
+x-cron-secret: <your CRON_SECRET>
+```
+
 ## Mock Mode
 
 If no API keys are configured, services run in mock mode:
@@ -134,6 +160,14 @@ If no API keys are configured, services run in mock mode:
 - SMS/WhatsApp print to console
 
 This allows full functionality testing without external services.
+
+## Security Notes
+
+- All policy and interaction data is scoped by `user_id`.
+- Browser clients do not access Supabase tables directly; API routes use `SUPABASE_SERVICE_KEY`.
+- The schema enables RLS and removes the old public read/write/delete policies.
+- Passwords are stored with scrypt hashes. Legacy SHA-256 hashes are upgraded automatically after a successful login.
+- JWTs require `JWT_SECRET`; the app no longer falls back to a hardcoded development secret.
 
 ## License
 

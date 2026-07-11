@@ -1,0 +1,143 @@
+.container {
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 14px;
+}
+
+.header h1 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.filters,
+.tablePanel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.04);
+}
+
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.filters select,
+.filters button {
+  min-height: 38px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.filters select {
+  min-width: 190px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 10px;
+}
+
+.filters button {
+  border: 0;
+  background: var(--primary);
+  color: #fff;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.tablePanel {
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+  font-size: 12px;
+}
+
+.table th {
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-weight: 900;
+}
+
+.table td {
+  color: #344054;
+}
+
+.table strong,
+.table small {
+  display: block;
+}
+
+.table strong {
+  color: var(--text);
+  font-weight: 900;
+}
+
+.table small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.actionPill {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.state {
+  min-height: 300px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .filters select,
+  .filters button {
+    width: 100%;
+  }
+
+  .tablePanel {
+    overflow-x: auto;
+  }
+
+  .table {
+    min-width: 760px;
+  }
+}

@@ -1,22 +1,9 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
 import { sendEmail } from '@/lib/sendgrid';
 import { sendSMS, sendWhatsApp } from '@/lib/twilio';
-import jwt from 'jsonwebtoken';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
-
-function getUserIdFromRequest(request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded.userId;
-  } catch {
-    return null;
-  }
-}
+import { getUserIdFromRequest } from '@/lib/server-auth';
+import { ALERT_CHANNELS, ALERT_TYPES, cleanString } from '@/lib/validation';
 
 export async function POST(request) {
   try {
@@ -31,18 +18,20 @@ export async function POST(request) {
       return NextResponse.json({ error: 'policy_id, channel, and type are required' }, { status: 400 });
     }
 
-    if (!['email', 'sms', 'whatsapp'].includes(channel)) {
+    if (!ALERT_CHANNELS.includes(channel)) {
       return NextResponse.json({ error: 'Invalid channel' }, { status: 400 });
     }
 
-    if (!['reminder', 'overdue', 'custom'].includes(type)) {
+    if (!ALERT_TYPES.includes(type)) {
       return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
     }
 
-    const { data: policy } = await supabase
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: policy } = await supabaseAdmin
       .from('policies')
       .select('*')
       .eq('id', policy_id)
+      .eq('user_id', userId)
       .single();
 
     if (!policy) {
@@ -53,7 +42,7 @@ export async function POST(request) {
       ? `Reminder: Your policy ${policy.policy_number} is due on ${policy.due_date}. Please ensure timely payment.`
       : type === 'overdue'
       ? `Alert: Your policy ${policy.policy_number} is overdue. Please make payment immediately.`
-      : message || 'Please contact us regarding your policy.';
+      : cleanString(message, 1000) || 'Please contact us regarding your policy.';
 
     let result;
 
@@ -78,10 +67,11 @@ export async function POST(request) {
         break;
     }
 
-    await supabase
+    await supabaseAdmin
       .from('interaction_logs')
       .insert({
         policy_id,
+        user_id: userId,
         remark: `Sent ${type} alert via ${channel}: ${defaultMessage}`
       });
 
@@ -92,6 +82,6 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('Send alert error:', error);
-    return NextResponse.json({ error: `Failed to send ${channel} alert` }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to send alert' }, { status: 500 });
   }
 }

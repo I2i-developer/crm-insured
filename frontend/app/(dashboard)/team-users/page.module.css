@@ -1,0 +1,227 @@
+.container {
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: 14px;
+}
+
+.header h1 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.summaryCard,
+.formPanel,
+.tablePanel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.04);
+}
+
+.summaryCard {
+  min-height: 88px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.summaryCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--primary);
+}
+
+.summaryCard span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.summaryCard strong {
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.formPanel {
+  display: grid;
+  gap: 12px;
+  padding: 15px;
+}
+
+.panelTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelTitle h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.panelTitle span {
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.formPanel label {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.formPanel input,
+.formPanel select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 11px;
+  font: inherit;
+  font-size: 12px;
+  outline: 0;
+}
+
+.formPanel input:focus,
+.formPanel select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+}
+
+.formPanel button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 7px;
+  background: var(--primary);
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.formPanel button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.tablePanel {
+  overflow: hidden;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-size: 12px;
+}
+
+.table th {
+  color: var(--muted);
+  background: var(--surface-soft);
+  font-weight: 900;
+}
+
+.table td {
+  color: #344054;
+}
+
+.userCell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.userCell > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef4ff;
+  color: var(--primary);
+  font-weight: 900;
+}
+
+.userCell strong,
+.userCell small {
+  display: block;
+}
+
+.userCell strong {
+  color: var(--text);
+}
+
+.userCell small {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.rolePill {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.state {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 980px) {
+  .workspace,
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+}

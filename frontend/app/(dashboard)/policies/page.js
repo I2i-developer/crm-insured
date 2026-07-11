@@ -4,41 +4,27 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { HEALTH_INSURANCE_COMPANIES, HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
+import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
-const INDIAN_INSURANCE_COMPANIES = [
-  'HDFC Ergo',
-  'Niva Bupa',
-  'Manipal Cigna',
-  'ICICI Lombard',
-  'Care Health',
-  'Tata AIG',
-  'Life Insurance Corporation (LIC)',
-  'HDFC Life Insurance',
-  'ICICI Prudential Life Insurance',
-  'SBI Life Insurance',
-  'Max Life Insurance',
-  'Bajaj Allianz Life Insurance',
-  'Kotak Mahindra Life Insurance',
-  'Aditya Birla Sun Life Insurance',
-  'Tata AIA Life Insurance',
-  'PNB MetLife India Insurance',
-  'Aviva Life Insurance',
-  'Reliance Nippon Life Insurance',
-  'Ageas Federal Life Insurance',
-  'Canara HSBC Life Insurance',
-  'Shriram Life Insurance',
-  'Star Union Dai-ichi Life Insurance',
-  'Bharti AXA Life Insurance',
-  'Future Generali India Life Insurance',
-  'IDBI Federal Life Insurance',
-  'Aegon Life Insurance',
-  'Other'
-];
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidPolicyId(id) {
+  return typeof id === 'string' && UUID_PATTERN.test(id);
+}
+
+function getClientInitial(name) {
+  const cleaned = String(name || '')
+    .replace(/^\s*(mr|mrs|ms|miss|dr|shri|smt)\.?\s+/i, '')
+    .trim();
+  return (cleaned.charAt(0) || 'C').toUpperCase();
+}
 
 export default function PoliciesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const toast = useToast();
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ total: 0, pendingRenewals: 0, paid: 0 });
@@ -67,6 +53,7 @@ export default function PoliciesPage() {
       setStats(data.stats);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
+      toast.error('Failed to load policy stats.');
     }
   };
 
@@ -83,6 +70,7 @@ export default function PoliciesPage() {
       setPagination(data.pagination);
     } catch (error) {
       console.error('Failed to fetch policies:', error);
+      toast.error('Failed to load policies.');
     } finally {
       setLoading(false);
     }
@@ -94,23 +82,37 @@ export default function PoliciesPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this policy?')) return;
+    const confirmed = await toast.confirm({
+      title: 'Delete policy?',
+      message: 'This will permanently remove the policy and its interaction history.',
+      confirmLabel: 'Delete'
+    });
+    if (!confirmed) return;
+
     try {
       await api.delete(`/policies/${id}`);
+      toast.success('Policy deleted successfully.');
       fetchPolicies();
       fetchStats();
     } catch (error) {
-      alert('Failed to delete policy');
+      toast.error(error.message || 'Failed to delete policy.');
     }
   };
 
   const handleStatusChange = async (id, newStatus) => {
+    if (!isValidPolicyId(id)) {
+      toast.error('This policy record is missing a valid id. Refresh the page and try again.');
+      fetchPolicies();
+      return;
+    }
+
     try {
       await api.put(`/policies/${id}`, { status: newStatus });
+      toast.success(`Policy marked as ${newStatus}.`);
       fetchPolicies();
       fetchStats();
     } catch (error) {
-      alert('Failed to update status');
+      toast.error(error.message || 'Failed to update status.');
     }
   };
 
@@ -189,7 +191,7 @@ export default function PoliciesPage() {
           />
           <select value={filters.company} onChange={(e) => handleFilterChange('company', e.target.value)} className={styles.select}>
             <option value="">All Companies</option>
-            {INDIAN_INSURANCE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {HEALTH_INSURANCE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)} className={styles.select}>
             <option value="">All Statuses</option>
@@ -230,6 +232,7 @@ export default function PoliciesPage() {
                 <tr>
                   <th>Client</th>
                   <th>Policy #</th>
+                  <th>Type</th>
                   <th>Company</th>
                   <th>Due Date</th>
                   <th>Amount</th>
@@ -240,15 +243,17 @@ export default function PoliciesPage() {
               <tbody>
                 {policies.map(policy => {
                   const days = getDaysUntilDue(policy.due_date);
+                  const hasValidId = isValidPolicyId(policy.id);
                   return (
-                    <tr key={policy.id}>
+                    <tr key={policy.id || `${policy.policy_number}-${policy.client_name}`}>
                       <td>
                         <div className={styles.clientCell}>
-                          <div className={styles.avatar}>{policy.client_name.charAt(0)}</div>
+                          <div className={styles.avatar}>{getClientInitial(policy.client_name)}</div>
                           <span>{policy.client_name}</span>
                         </div>
                       </td>
                       <td className={styles.policyNumber}>{policy.policy_number}</td>
+                      <td>{policy.policy_type || HEALTH_POLICY_TYPE}</td>
                       <td>{policy.insurance_company}</td>
                       <td>
                         <span className={days <= 7 ? styles.urgent : days <= 30 ? styles.soon : ''}>
@@ -262,7 +267,9 @@ export default function PoliciesPage() {
                         <select
                           value={policy.status}
                           onChange={(e) => handleStatusChange(policy.id, e.target.value)}
+                          disabled={!hasValidId}
                           className={`${styles.statusSelect} ${getStatusClass(policy.status)}`}
+                          title={hasValidId ? 'Update policy status' : 'Policy id is missing'}
                         >
                           <option value="Pending">Pending</option>
                           <option value="Paid">Paid</option>
@@ -273,9 +280,15 @@ export default function PoliciesPage() {
                       </td>
                       <td>
                         <div className={styles.actionBtns}>
-                          <Link href={`/policies/edit/${policy.id}`} className={styles.editBtn}>Edit</Link>
-                          <Link href={`/interactions?policy=${policy.id}`} className={styles.logBtn}>Logs</Link>
-                          <button onClick={() => handleDelete(policy.id)} className={styles.deleteBtn}>Delete</button>
+                          {hasValidId ? (
+                            <>
+                              <Link href={`/policies/edit/${policy.id}`} className={styles.editBtn}>Edit</Link>
+                              <Link href={`/interactions?policy=${policy.id}`} className={styles.logBtn}>Logs</Link>
+                              <button onClick={() => handleDelete(policy.id)} className={styles.deleteBtn}>Delete</button>
+                            </>
+                          ) : (
+                            <span className={styles.invalidRecord}>Missing ID</span>
+                          )}
                         </div>
                       </td>
                     </tr>

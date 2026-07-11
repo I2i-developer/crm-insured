@@ -24,7 +24,10 @@ export const AuthProvider = ({ children }) => {
     const userData = {
       id: data.user.id,
       email: data.user.email,
-      name: data.user.name
+      name: data.user.name,
+      role: data.user.role || 'team_member',
+      avatar_url: data.user.avatar_url || '',
+      designation: data.user.designation || ''
     };
 
     localStorage.setItem('token', data.token);
@@ -47,7 +50,10 @@ export const AuthProvider = ({ children }) => {
     const userData = {
       id: data.user.id,
       email: data.user.email,
-      name: data.user.name
+      name: data.user.name,
+      role: data.user.role || 'team_member',
+      avatar_url: data.user.avatar_url || '',
+      designation: data.user.designation || ''
     };
 
     localStorage.setItem('token', data.token);

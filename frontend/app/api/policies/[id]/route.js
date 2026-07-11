@@ -1,35 +1,47 @@
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase';
-import jwt from 'jsonwebtoken';
+import { writeAuditLog } from '@/lib/audit';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { validatePolicyInput } from '@/lib/validation';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function getUserIdFromRequest(request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded.userId;
-  } catch {
-    return null;
-  }
+function isValidPolicyId(id) {
+  return typeof id === 'string' && UUID_PATTERN.test(id);
+}
+
+function invalidPolicyIdResponse() {
+  return NextResponse.json({ error: 'Invalid policy id' }, { status: 400 });
+}
+
+async function getPolicyId(params) {
+  const resolvedParams = await params;
+  return resolvedParams?.id;
 }
 
 export async function GET(request, { params }) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
+    const id = await getPolicyId(params);
+    if (!isValidPolicyId(id)) {
+      return invalidPolicyIdResponse();
+    }
 
-    const { data, error } = await supabaseAdmin
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
       .from('policies')
       .select('*')
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+
+    if (!isPrivilegedRole(auth.role)) {
+      query = query.eq('user_id', auth.userId);
+    }
+
+    const { data, error } = await query.single();
 
     if (error) {
       return NextResponse.json({ error: 'Policy not found' }, { status: 404 });
@@ -44,29 +56,44 @@ export async function GET(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
-    const body = await request.json();
-    const updates = body;
-
-    if (updates.premium_amount) {
-      updates.premium_amount = parseFloat(updates.premium_amount);
+    const id = await getPolicyId(params);
+    if (!isValidPolicyId(id)) {
+      return invalidPolicyIdResponse();
     }
 
-    const { data, error } = await supabaseAdmin
+    const { policy: updates, errors } = validatePolicyInput(await request.json(), { partial: true });
+    if (errors.length) {
+      return NextResponse.json({ error: errors.join(', ') }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
       .from('policies')
       .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+
+    if (!isPrivilegedRole(auth.role)) {
+      query = query.eq('user_id', auth.userId);
+    }
+
+    const { data, error } = await query.select().single();
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await writeAuditLog(request, auth, {
+      action: 'policy.update',
+      entityType: 'policy',
+      entityId: data.id,
+      summary: `Updated policy ${data.policy_number} for ${data.client_name}`,
+      metadata: { updates: Object.keys(updates), policy_number: data.policy_number }
+    });
 
     return NextResponse.json({ message: 'Policy updated successfully', policy: data });
   } catch (error) {
@@ -77,21 +104,39 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
+    const id = await getPolicyId(params);
+    if (!isValidPolicyId(id)) {
+      return invalidPolicyIdResponse();
+    }
 
-    const { error } = await supabaseAdmin
+    const supabaseAdmin = getSupabaseAdmin();
+    let query = supabaseAdmin
       .from('policies')
       .delete()
       .eq('id', id);
 
+    if (!isPrivilegedRole(auth.role)) {
+      query = query.eq('user_id', auth.userId);
+    }
+
+    const { data, error } = await query.select('id, policy_number, client_name').single();
+
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    await writeAuditLog(request, auth, {
+      action: 'policy.delete',
+      entityType: 'policy',
+      entityId: data.id,
+      summary: `Deleted policy ${data.policy_number} for ${data.client_name}`,
+      metadata: { policy_number: data.policy_number, client_name: data.client_name }
+    });
 
     return NextResponse.json({ message: 'Policy deleted successfully' });
   } catch (error) {

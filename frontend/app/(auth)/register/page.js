@@ -2,13 +2,16 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/authContext';
+import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
 export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
@@ -24,20 +27,25 @@ export default function RegisterPage() {
 
     if (form.password !== form.confirmPassword) {
       setError('Passwords do not match');
+      toast.warning('Passwords do not match.');
       return;
     }
 
     if (form.password.length < 6) {
       setError('Password must be at least 6 characters');
+      toast.warning('Password must be at least 6 characters.');
       return;
     }
 
     setLoading(true);
     try {
       await register(form.email, form.password, form.name);
+      toast.success('Account created successfully.');
       router.push('/dashboard');
     } catch (err) {
-      setError(err.message || 'Registration failed');
+      const message = err.message || 'Registration failed';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -47,7 +55,7 @@ export default function RegisterPage() {
     <div className={styles.authContainer}>
       <div className={styles.authCard}>
         <div className={styles.logoWrapper}>
-          <img src="/logo.png" alt="Insured Renewal Portal" className={styles.logo} />
+          <Image src="/logo.png" alt="Insured Renewal Portal" width={180} height={90} className={styles.logo} priority />
         </div>
 
         <h2>Create Account</h2>

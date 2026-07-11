@@ -1,5 +1,4 @@
-// const sgMail = require('sendgrid/mail');
-const sgMail = require('@sendgrid/mail');
+import sgMail from '@sendgrid/mail';
 
 const apiKey = process.env.SENDGRID_API_KEY;
 
@@ -7,7 +6,7 @@ if (apiKey) {
   sgMail.setApiKey(apiKey);
 }
 
-const sendEmail = async (to, subject, message) => {
+export const sendEmail = async (to, subject, message) => {
   try {
     if (!apiKey) {
       console.log('[MOCK EMAIL] To:', to, 'Subject:', subject, 'Message:', message);
@@ -43,5 +42,3 @@ const sendEmail = async (to, subject, message) => {
     throw new Error(`Failed to send email: ${error.message}`);
   }
 };
-
-module.exports = { sendEmail };

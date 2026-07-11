@@ -1,0 +1,401 @@
+.container {
+  max-width: 1360px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.header h1 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.summaryCard,
+.formPanel,
+.leadPanel,
+.leadCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.04);
+}
+
+.summaryCard {
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.summaryCard::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--primary);
+}
+
+.success::before { background: var(--success); }
+.warning::before { background: var(--warning); }
+.danger::before { background: var(--danger); }
+
+.summaryCard span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.summaryCard strong {
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 390px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.formPanel {
+  padding: 15px;
+  display: grid;
+  gap: 12px;
+  position: sticky;
+  top: 84px;
+}
+
+.panelTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelTitle h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.panelTitle span {
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.formPanel label {
+  display: grid;
+  gap: 6px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.formPanel input,
+.formPanel select,
+.formPanel textarea,
+.filters input,
+.filters select,
+.controls select,
+.remarkInput input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.formPanel input,
+.formPanel select,
+.formPanel textarea,
+.filters input,
+.filters select,
+.controls select,
+.remarkInput input {
+  padding: 0 11px;
+}
+
+.formPanel textarea {
+  min-height: 92px;
+  padding-top: 9px;
+  resize: vertical;
+}
+
+.formPanel input:focus,
+.formPanel select:focus,
+.formPanel textarea:focus,
+.filters input:focus,
+.filters select:focus,
+.controls select:focus,
+.remarkInput input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+}
+
+.twoCols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.formPanel button,
+.remarkInput button,
+.deleteBtn {
+  min-height: 38px;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.formPanel button {
+  background: var(--primary);
+  color: #fff;
+}
+
+.formPanel button:disabled,
+.remarkInput button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.leadPanel {
+  padding: 12px;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 160px 160px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.state {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.leadList {
+  display: grid;
+  gap: 12px;
+}
+
+.leadCard {
+  padding: 14px;
+}
+
+.leadTop {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef4ff;
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.leadTop h2 {
+  margin: 0 0 5px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.leadTop p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.deleteBtn {
+  padding: 0 12px;
+  background: #fff1f3;
+  color: #b42318;
+}
+
+.leadMeta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.leadMeta span {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  border-radius: 7px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.leadMeta strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 190px));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.notes {
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-soft);
+  color: #475467;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.remarks {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.remarksHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.remarksHeader strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.remarksHeader span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.remarks ul {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.remarks li {
+  padding: 9px;
+  border-radius: 7px;
+  background: var(--surface-soft);
+}
+
+.remarks li p,
+.noRemarks {
+  margin: 0;
+  color: #344054;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.remarks time {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.noRemarks {
+  margin-bottom: 10px;
+  color: var(--muted);
+}
+
+.remarkInput {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  gap: 8px;
+}
+
+.remarkInput button {
+  background: var(--primary);
+  color: #fff;
+}
+
+@media (max-width: 1180px) {
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .formPanel {
+    position: static;
+  }
+}
+
+@media (max-width: 760px) {
+  .summaryGrid,
+  .twoCols,
+  .filters,
+  .leadMeta,
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .leadTop {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .deleteBtn {
+    grid-column: 1 / -1;
+  }
+}

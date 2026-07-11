@@ -1,4 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --app-bg: #e9eef3;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --line: #e6eaf0;
+  --line-strong: #d8dee8;
+  --text: #111827;
+  --muted: #6b7280;
+  --muted-light: #98a2b3;
+  --primary: #4f46e5;
+  --primary-dark: #3730a3;
+  --success: #16a34a;
+  --warning: #eab308;
+  --danger: #ef4444;
+  --teal: #0ea5b7;
+  --shadow-soft: 0 18px 55px rgba(15, 23, 42, 0.08);
+}
 
 * {
   box-sizing: border-box;
@@ -10,14 +28,25 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
-  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: #f8f9fc;
-  color: #1a1a2e;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--app-bg);
+  color: var(--text);
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
 }
 
 ::-webkit-scrollbar {
@@ -26,14 +55,14 @@ a {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #edf1f5;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: #c9d1dc;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: #aeb8c7;
 }

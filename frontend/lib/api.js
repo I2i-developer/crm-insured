@@ -2,9 +2,10 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export const fetchAPI = async (endpoint, options = {}) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
 
   const headers = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...options.headers
   };
 
@@ -19,7 +20,10 @@ export const fetchAPI = async (endpoint, options = {}) => {
     headers
   });
 
-  const data = await res.json();
+  const contentType = res.headers.get('content-type') || '';
+  const data = contentType.includes('application/json')
+    ? await res.json()
+    : { error: await res.text() || 'API request failed' };
 
   if (!res.ok) {
     throw new Error(data.error || 'API request failed');
@@ -33,5 +37,5 @@ export const api = {
   post: (endpoint, body) => fetchAPI(endpoint, { method: 'POST', body: JSON.stringify(body) }),
   put: (endpoint, body) => fetchAPI(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (endpoint) => fetchAPI(endpoint, { method: 'DELETE' }),
-  upload: (endpoint, formData) => fetchAPI(endpoint, { method: 'POST', headers: {}, body: formData })
+  upload: (endpoint, formData) => fetchAPI(endpoint, { method: 'POST', body: formData })
 };

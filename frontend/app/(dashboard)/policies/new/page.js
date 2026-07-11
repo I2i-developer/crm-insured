@@ -3,50 +3,27 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { HEALTH_INSURANCE_COMPANIES, HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
+import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
-const INDIAN_INSURANCE_COMPANIES = [
-  'HDFC Ergo',
-  'Niva Bupa',
-  'Manipal Cigna',
-  'ICICI Lombard',
-  'Care Health',
-  'Tata AIG',
-  'Life Insurance Corporation (LIC)',
-  'HDFC Life Insurance',
-  'ICICI Prudential Life Insurance',
-  'SBI Life Insurance',
-  'Max Life Insurance',
-  'Bajaj Allianz Life Insurance',
-  'Kotak Mahindra Life Insurance',
-  'Aditya Birla Sun Life Insurance',
-  'Tata AIA Life Insurance',
-  'PNB MetLife India Insurance',
-  'Aviva Life Insurance',
-  'Reliance Nippon Life Insurance',
-  'Ageas Federal Life Insurance',
-  'Canara HSBC Life Insurance',
-  'Shriram Life Insurance',
-  'Star Union Dai-ichi Life Insurance',
-  'Bharti AXA Life Insurance',
-  'Future Generali India Life Insurance',
-  'IDBI Federal Life Insurance',
-  'Aegon Life Insurance',
-  'Other'
-];
-
 const STATUS_OPTIONS = ['Pending', 'Paid', 'Overdue', 'Grace Period', 'Lapsed'];
+const OTHER_COMPANY = 'Other';
 
 export default function NewPolicyPage() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
     client_name: '',
+    policy_type: HEALTH_POLICY_TYPE,
     insurance_company: '',
+    other_company: '',
     policy_number: '',
     premium_amount: '',
     due_date: '',
+    payment_due_date: '',
     issuance_date: '',
     phone: '',
     email: '',
@@ -55,7 +32,11 @@ export default function NewPolicyPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm(prev => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'insurance_company' && value !== OTHER_COMPANY ? { other_company: '' } : {})
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -66,13 +47,18 @@ export default function NewPolicyPage() {
     try {
       const payload = {
         ...form,
+        insurance_company: form.insurance_company === OTHER_COMPANY ? form.other_company : form.insurance_company,
         premium_amount: parseFloat(form.premium_amount)
       };
+      delete payload.other_company;
 
       await api.post('/policies', payload);
+      toast.success('Health policy created successfully.');
       router.push('/policies');
     } catch (err) {
-      setError(err.message || 'Failed to create policy');
+      const message = err.message || 'Failed to create policy';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -81,8 +67,8 @@ export default function NewPolicyPage() {
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <h1>Add New Policy</h1>
-        <p>Enter policy details for a new client</p>
+        <h1>Add Health Policy</h1>
+        <p>Enter health policy details for a new client</p>
       </header>
 
       <form onSubmit={handleSubmit} className={styles.form}>
@@ -105,7 +91,28 @@ export default function NewPolicyPage() {
             <label>Insurance Company *</label>
             <select name="insurance_company" value={form.insurance_company} onChange={handleChange} required>
               <option value="">Select company</option>
-              {INDIAN_INSURANCE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {HEALTH_INSURANCE_COMPANIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {form.insurance_company === OTHER_COMPANY && (
+            <div className={styles.field}>
+              <label>Specify Company *</label>
+              <input
+                type="text"
+                name="other_company"
+                value={form.other_company}
+                onChange={handleChange}
+                required
+                placeholder="Enter company name"
+              />
+            </div>
+          )}
+
+          <div className={styles.field}>
+            <label>Policy Type</label>
+            <select name="policy_type" value={form.policy_type} onChange={handleChange}>
+              <option value={HEALTH_POLICY_TYPE}>{HEALTH_POLICY_TYPE}</option>
             </select>
           </div>
 
@@ -154,6 +161,16 @@ export default function NewPolicyPage() {
               value={form.issuance_date}
               onChange={handleChange}
               required
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label>Payment Due Date</label>
+            <input
+              type="date"
+              name="payment_due_date"
+              value={form.payment_due_date}
+              onChange={handleChange}
             />
           </div>
 

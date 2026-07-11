@@ -1,8 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    serverComponentsExternalPackages: ['bcrypt', 'sendgrid', 'twilio']
+  serverExternalPackages: ['@sendgrid/mail', 'twilio'],
+  turbopack: {
+    root: __dirname
   },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '',

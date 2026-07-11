@@ -1,27 +1,95 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
-import jwt from 'jsonwebtoken';
-// import xlsx from 'xlsx';
-import * as xlsx from 'xlsx';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { getAuthFromRequest } from '@/lib/server-auth';
+import { validatePolicyInput } from '@/lib/validation';
+import ExcelJS from 'exceljs';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+function parseCsvLine(line) {
+  const values = [];
+  let current = '';
+  let quoted = false;
 
-function getUserIdFromRequest(request) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-    return decoded.userId;
-  } catch {
-    return null;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const next = line[index + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === ',' && !quoted) {
+      values.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
   }
+
+  values.push(current.trim());
+  return values;
+}
+
+function normalizeCellValue(value) {
+  if (value && typeof value === 'object' && !(value instanceof Date)) {
+    if ('result' in value) return value.result;
+    if ('text' in value) return value.text;
+    if ('richText' in value && Array.isArray(value.richText)) {
+      return value.richText.map(part => part.text || '').join('');
+    }
+  }
+
+  return value;
+}
+
+async function parseImportFile(file, buffer) {
+  const fileName = (file.name || '').toLowerCase();
+
+  if (fileName.endsWith('.csv') || file.type === 'text/csv') {
+    const text = Buffer.from(buffer).toString('utf8').replace(/^\uFEFF/, '');
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    if (lines.length < 2) return [];
+
+    const headers = parseCsvLine(lines[0]);
+    return lines.slice(1).map(line => {
+      const values = parseCsvLine(line);
+      return headers.reduce((row, header, index) => {
+        row[header] = values[index] ?? '';
+        return row;
+      }, {});
+    });
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Buffer.from(buffer));
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) return [];
+
+  const headers = [];
+  worksheet.getRow(1).eachCell((cell, colNumber) => {
+    headers[colNumber] = String(cell.value || '').trim();
+  });
+
+  const rows = [];
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return;
+    const record = {};
+    headers.forEach((header, colNumber) => {
+      if (!header) return;
+      record[header] = normalizeCellValue(row.getCell(colNumber).value);
+    });
+    if (Object.values(record).some(value => value !== null && value !== undefined && value !== '')) {
+      rows.push(record);
+    }
+  });
+
+  return rows;
 }
 
 export async function POST(request) {
   try {
-    const userId = getUserIdFromRequest(request);
-    if (!userId) {
+    const auth = getAuthFromRequest(request);
+    if (!auth) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -32,14 +100,25 @@ export async function POST(request) {
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
+    const fileName = (file.name || '').toLowerCase();
+    const supportedFile = fileName.endsWith('.csv') || fileName.endsWith('.xlsx');
+    if (!supportedFile) {
+      return NextResponse.json({ error: 'Only CSV or Excel files are supported' }, { status: 400 });
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File must be 2MB or smaller' }, { status: 400 });
+    }
+
     const buffer = await file.arrayBuffer();
-    const workbook = xlsx.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const data = xlsx.utils.sheet_to_json(worksheet);
+    const data = await parseImportFile(file, buffer);
 
     if (data.length === 0) {
       return NextResponse.json({ error: 'No data found in file' }, { status: 400 });
+    }
+
+    if (data.length > 1000) {
+      return NextResponse.json({ error: 'Import is limited to 1000 rows per file' }, { status: 400 });
     }
 
     const requiredFields = ['client_name', 'insurance_company', 'policy_number', 'premium_amount', 'due_date', 'issuance_date'];
@@ -53,19 +132,26 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const policiesToInsert = data.map(row => ({
-      client_name: row.client_name,
-      insurance_company: row.insurance_company,
-      policy_number: String(row.policy_number),
-      premium_amount: parseFloat(row.premium_amount),
-      due_date: new Date(row.due_date).toISOString().split('T')[0],
-      issuance_date: new Date(row.issuance_date).toISOString().split('T')[0],
-      phone: row.phone || null,
-      email: row.email || null,
-      status: row.status || 'Pending'
-    }));
+    const rows = data.map((row, index) => {
+      const { policy, errors } = validatePolicyInput(row);
+      return { policy: { ...policy, user_id: auth.userId }, errors, rowNumber: index + 2 };
+    });
 
-    const { data: insertedData, error: insertError } = await supabase
+    const invalidRows = rows.filter(row => row.errors.length);
+    if (invalidRows.length) {
+      return NextResponse.json({
+        error: 'Import contains invalid rows',
+        rows: invalidRows.slice(0, 10).map(row => ({
+          row: row.rowNumber,
+          errors: row.errors
+        }))
+      }, { status: 400 });
+    }
+
+    const policiesToInsert = rows.map(row => row.policy);
+
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: insertedData, error: insertError } = await supabaseAdmin
       .from('policies')
       .insert(policiesToInsert)
       .select();

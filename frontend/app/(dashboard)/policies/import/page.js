@@ -3,15 +3,16 @@
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
 export default function ImportPoliciesPage() {
   const router = useRouter();
+  const toast = useToast();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [preview, setPreview] = useState([]);
   const fileInputRef = useRef(null);
 
   const handleFileSelect = (e) => {
@@ -25,7 +26,9 @@ export default function ImportPoliciesPage() {
     ];
 
     if (!validTypes.includes(file.type) && !file.name.endsWith('.csv') && !file.name.endsWith('.xlsx')) {
-      setError('Please select a valid CSV or Excel file');
+      const message = 'Please select a valid CSV or Excel file';
+      setError(message);
+      toast.error(message);
       return;
     }
 
@@ -49,7 +52,9 @@ export default function ImportPoliciesPage() {
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setError('Please select a file first');
+      const message = 'Please select a file first';
+      setError(message);
+      toast.warning(message);
       return;
     }
 
@@ -61,27 +66,19 @@ export default function ImportPoliciesPage() {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/policies/import`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
-      });
+      const data = await api.upload('/policies/import', formData);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Import failed');
-      }
-
-      setSuccess(`Successfully imported ${data.imported} policies! ${data.failed > 0 ? `${data.failed} failed.` : ''}`);
+      const message = `Successfully imported ${data.imported} policies. ${data.failed > 0 ? `${data.failed} failed.` : ''}`;
+      setSuccess(message);
+      toast.success(message);
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
 
       setTimeout(() => router.push('/policies'), 2000);
     } catch (err) {
-      setError(err.message || 'Failed to import file');
+      const message = err.message || 'Failed to import file';
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -99,7 +96,8 @@ export default function ImportPoliciesPage() {
         <ul>
           <li>Supported formats: CSV, XLSX</li>
           <li>Required columns: client_name, insurance_company, policy_number, premium_amount, due_date, issuance_date</li>
-          <li>Optional columns: phone, email, status</li>
+          <li>Optional columns: policy_type, payment_due_date, phone, email, status</li>
+          <li>For this CRM, policy_type should be Health Insurance. Blank values are treated as Health Insurance.</li>
           <li>Date format: YYYY-MM-DD or MM/DD/YYYY</li>
         </ul>
       </div>
@@ -159,8 +157,8 @@ export default function ImportPoliciesPage() {
         <h3>Download Template</h3>
         <p>Use this template to ensure your data is formatted correctly:</p>
         <button onClick={() => {
-          const headers = ['client_name', 'insurance_company', 'policy_number', 'premium_amount', 'due_date', 'issuance_date', 'phone', 'email', 'status'];
-          const sampleRow = ['John Doe', 'Allstate', 'POL-001', '1500.00', '2026-05-15', '2025-05-15', '+1234567890', 'john@example.com', 'Pending'];
+          const headers = ['client_name', 'policy_type', 'insurance_company', 'policy_number', 'premium_amount', 'due_date', 'payment_due_date', 'issuance_date', 'phone', 'email', 'status'];
+          const sampleRow = ['John Doe', 'Health Insurance', 'HDFC', 'POL-001', '1500.00', '2026-05-15', '2026-05-01', '2025-05-15', '+919876543210', 'john@example.com', 'Pending'];
           const csv = [headers.join(','), sampleRow.join(',')].join('\n');
           const blob = new Blob([csv], { type: 'text/csv' });
           const url = URL.createObjectURL(blob);

@@ -1,140 +1,138 @@
 .container {
-  max-width: 900px;
+  max-width: 980px;
   margin: 0 auto;
-  animation: fadeIn 0.4s ease-out;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 .header {
-  margin-bottom: 32px;
+  margin-bottom: 16px;
 }
 
 .header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: #1a1a2e;
-  margin-bottom: 8px;
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
 }
 
 .header p {
-  color: #6b7280;
-  font-size: 14px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .form {
-  background: white;
-  border-radius: 20px;
-  padding: 32px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
 }
 
 .errorMsg {
-  padding: 14px 16px;
-  background: linear-gradient(135deg, #fef2f2, #fee2e2);
-  color: #dc2626;
-  border-radius: 12px;
-  margin-bottom: 24px;
-  font-size: 14px;
-  border: 1px solid #fecaca;
+  padding: 11px 12px;
+  margin-bottom: 14px;
+  border: 1px solid #fecdd3;
+  border-radius: 7px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .formGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .field {
+  min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: 7px;
 }
 
 .field label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #374151;
-  margin-bottom: 8px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
 }
 
-.field input, .field select, .field textarea {
-  padding: 14px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  font-size: 14px;
-  font-family: inherit;
-  transition: all 0.2s;
-  background: #f9fafb;
-}
-
-.field input:focus, .field select:focus, .field textarea:focus {
-  outline: none;
-  border-color: #1e3a5f;
-  background: white;
-  box-shadow: 0 0 0 4px rgba(30, 58, 95, 0.1);
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 11px;
+  font-size: 12px;
+  outline: 0;
 }
 
 .field textarea {
+  min-height: 104px;
+  padding-top: 10px;
   resize: vertical;
-  min-height: 100px;
+  line-height: 1.5;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: #b9c0ff;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
 .formActions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid #f3f4f6;
+  gap: 9px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.cancelBtn,
+.submitBtn {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  padding: 0 14px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .cancelBtn {
-  padding: 14px 28px;
-  background: white;
-  border: 2px solid #e5e7eb;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  color: #374151;
-  transition: all 0.2s;
-}
-
-.cancelBtn:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: #344054;
 }
 
 .submitBtn {
-  padding: 14px 32px;
-  background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
-  color: white;
-  border: none;
-  border-radius: 12px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 14px rgba(30, 58, 95, 0.3);
-}
-
-.submitBtn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(30, 58, 95, 0.4);
+  background: var(--primary);
+  color: #fff;
 }
 
 .submitBtn:disabled {
-  opacity: 0.7;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 760px) {
   .formGrid {
     grid-template-columns: 1fr;
+  }
+
+  .formActions {
+    flex-direction: column-reverse;
+  }
+
+  .cancelBtn,
+  .submitBtn {
+    width: 100%;
   }
 }

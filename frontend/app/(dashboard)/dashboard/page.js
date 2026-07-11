@@ -1,16 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
+
+const STATUS_ORDER = ['Paid', 'Pending', 'Overdue', 'Grace Period', 'Lapsed'];
+const STATUS_COLORS = {
+  Paid: '#16a34a',
+  Pending: '#eab308',
+  Overdue: '#ef4444',
+  'Grace Period': '#0ea5b7',
+  Lapsed: '#667085'
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default function DashboardPage() {
   const router = useRouter();
+  const toast = useToast();
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState({ total: 0, pendingRenewals: 0, paid: 0, overdue: 0, gracePeriod: 0, lapsed: 0 });
-  const [upcomingPolicies, setUpcomingPolicies] = useState([]);
+  const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeStatus, setActiveStatus] = useState('All');
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -36,17 +51,81 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      const statsData = await api.get('/policies/stats');
+      const [statsData, policyData] = await Promise.all([
+        api.get('/policies/stats'),
+        api.get('/policies?page=1&limit=1000&sort_by=due_date&sort_order=asc')
+      ]);
       setStats(statsData.stats);
-
-      const policiesData = await api.get('/policies?limit=5&sort_by=due_date&sort_order=asc&status=Pending');
-      setUpcomingPolicies(policiesData.policies || []);
+      setPolicies(policyData.policies || []);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
+      toast.error('Failed to load dashboard data.');
     } finally {
       setLoading(false);
     }
   };
+
+  const metrics = useMemo(() => {
+    const totalPremium = policies.reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
+    const paidPremium = policies
+      .filter(policy => policy.status === 'Paid')
+      .reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dueInSeven = policies.filter(policy => {
+      const due = new Date(policy.due_date);
+      return policy.status !== 'Paid' && due >= today && due <= new Date(today.getTime() + 7 * DAY_MS);
+    }).length;
+
+    const overdueValue = policies
+      .filter(policy => policy.status === 'Overdue' || new Date(policy.due_date) < today)
+      .reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
+
+    const paidRate = stats.total ? Math.round((stats.paid / stats.total) * 100) : 0;
+    const riskCount = stats.overdue + stats.gracePeriod + stats.lapsed;
+
+    return { totalPremium, paidPremium, dueInSeven, overdueValue, paidRate, riskCount };
+  }, [policies, stats]);
+
+  const statusRows = STATUS_ORDER.map(status => {
+    const count = status === 'Pending' ? stats.pendingRenewals : stats[status === 'Grace Period' ? 'gracePeriod' : status.toLowerCase()] || 0;
+    const percent = stats.total ? Math.round((count / stats.total) * 100) : 0;
+    const premium = policies
+      .filter(policy => policy.status === status)
+      .reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
+    return { status, count, percent, premium, color: STATUS_COLORS[status] };
+  });
+  const statusPanelRows = [
+    { status: 'All', count: stats.total || 0, percent: 100, premium: metrics.totalPremium, color: 'var(--primary)' },
+    ...statusRows
+  ];
+  const visibleStatusRows = activeStatus === 'All' ? statusRows : statusRows.filter(row => row.status === activeStatus);
+
+  const renewalBuckets = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const buckets = [
+      { label: 'Overdue', min: -Infinity, max: -1, count: 0 },
+      { label: '0-7 days', min: 0, max: 7, count: 0 },
+      { label: '8-15 days', min: 8, max: 15, count: 0 },
+      { label: '16-30 days', min: 16, max: 30, count: 0 },
+      { label: '30+ days', min: 31, max: Infinity, count: 0 }
+    ];
+
+    policies
+      .filter(policy => policy.status !== 'Paid')
+      .forEach(policy => {
+        const due = new Date(policy.due_date);
+        due.setHours(0, 0, 0, 0);
+        const days = Math.ceil((due - today) / DAY_MS);
+        const bucket = buckets.find(item => days >= item.min && days <= item.max);
+        if (bucket) bucket.count += 1;
+      });
+
+    const max = Math.max(1, ...buckets.map(bucket => bucket.count));
+    return buckets.map(bucket => ({ ...bucket, percent: Math.round((bucket.count / max) * 100) }));
+  }, [policies]);
 
   if (!user) {
     return (
@@ -57,250 +136,278 @@ export default function DashboardPage() {
     );
   }
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-  };
-
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
-  };
-
-  const getDaysUntilDue = (date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const due = new Date(date);
-    due.setHours(0, 0, 0, 0);
-    return Math.ceil((due - today) / (1000 * 60 * 60 * 24));
+  const formatCurrency = (amount) => new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0
+  }).format(amount || 0);
+  const roleView = {
+    super_admin: {
+      title: 'SuperAdmin Dashboard',
+      description: 'Full CRM governance view for testing, user access, audit tracking, and health policy operations.',
+      eyebrow: 'System Summary',
+      totalLabel: 'team health policies under management'
+    },
+    admin: {
+      title: 'Admin Team Dashboard',
+      description: 'Team-head view for monitoring leads, renewals, payment risk, and agent follow-up priorities.',
+      eyebrow: 'Team Summary',
+      totalLabel: 'team health policies under management'
+    },
+    team_member: {
+      title: 'Agent Dashboard',
+      description: 'Focused view of your assigned health policies, renewals, payment follow-ups, and action queue.',
+      eyebrow: 'My Summary',
+      totalLabel: 'health policies assigned to you'
+    }
+  }[user.role] || {
+    title: 'Executive Dashboard',
+    description: 'Health policy portfolio summary, renewal risk, payment movement, and team action signals.',
+    eyebrow: 'Executive Summary',
+    totalLabel: 'health policies under management'
   };
 
   return (
     <div className={styles.dashboard}>
       <header className={styles.header}>
         <div>
-          <h1>Welcome back, {user.name || 'User'}!</h1>
-          <p>Here&apos;s what&apos;s happening with your policies today.</p>
+          <h1>{roleView.title}</h1>
+          <p>{roleView.description}</p>
         </div>
-        <div className={styles.headerDate}>
+        {/* <div className={styles.headerDate}>
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-        </div>
+        </div> */}
       </header>
 
-      <div className={styles.bentoGrid}>
-        <div className={`${styles.bentoCard} ${styles.statCard} ${styles.totalCard}`}>
-          <div className={styles.statIcon}>
-            <TotalIcon />
-          </div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Total Policies</span>
-            <span className={styles.statValue}>{loading ? '-' : stats.total}</span>
-          </div>
-          <a href="/policies" className={styles.cardLink}></a>
+      <section className={styles.summaryPanel}>
+        <div>
+          <span className={styles.eyebrow}>{roleView.eyebrow}</span>
+          <h2>{loading ? 'Loading portfolio...' : `${stats.total} ${roleView.totalLabel}`}</h2>
+          <p>
+            {metrics.riskCount > 0
+              ? `${metrics.riskCount} policies need attention across overdue, grace, or lapsed stages.`
+              : 'No high-risk policy stage is currently flagged.'}
+          </p>
         </div>
-
-        <div className={`${styles.bentoCard} ${styles.statCard} ${styles.pendingCard}`}>
-          <div className={styles.statIcon}>
-            <PendingIcon />
-          </div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Pending Renewals</span>
-            <span className={styles.statValue}>{loading ? '-' : stats.pendingRenewals}</span>
-          </div>
-          <a href="/policies?filter=Pending" className={styles.cardLink}></a>
+        <div className={styles.summaryMetrics}>
+          <span>Paid rate <strong>{loading ? '-' : `${metrics.paidRate}%`}</strong></span>
+          <span>7-day renewals <strong>{loading ? '-' : metrics.dueInSeven}</strong></span>
+          <span>At-risk value <strong>{loading ? '-' : formatCurrency(metrics.overdueValue)}</strong></span>
         </div>
+      </section>
 
-        <div className={`${styles.bentoCard} ${styles.statCard} ${styles.paidCard}`}>
-          <div className={styles.statIcon}>
-            <PaidIcon />
-          </div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Paid Policies</span>
-            <span className={styles.statValue}>{loading ? '-' : stats.paid}</span>
-          </div>
-          <a href="/policies?filter=Paid" className={styles.cardLink}></a>
-        </div>
+      <div className={styles.statGrid}>
+        <MetricCard icon={<PolicyTotalIcon />} label="Portfolio Value" value={loading ? '-' : formatCurrency(metrics.totalPremium)} hint={`${stats.total || 0} active records`} tone="primary" />
+        <MetricCard icon={<PolicyPaidIcon />} label="Paid Premium" value={loading ? '-' : formatCurrency(metrics.paidPremium)} hint={`${metrics.paidRate}% collected`} tone="success" />
+        <MetricCard icon={<PolicyPendingIcon />} label="Pending Renewals" value={loading ? '-' : stats.pendingRenewals} hint={`${metrics.dueInSeven} due in 7 days`} tone="warning" href="/upcoming-renewals" />
+        <MetricCard icon={<PolicyOverdueIcon />} label="Risk Queue" value={loading ? '-' : metrics.riskCount} hint={formatCurrency(metrics.overdueValue)} tone="danger" href="/expired-policies" />
+      </div>
 
-        <div className={`${styles.bentoCard} ${styles.statCard} ${styles.graceCard}`}>
-          <div className={styles.statIcon}>
-            <GraceIcon />
+      <div className={styles.graphGrid}>
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2><StatusIcon />Status Distribution</h2>
+            <span>{stats.total || 0} total</span>
           </div>
-          <div className={styles.statContent}>
-            <span className={styles.statLabel}>Grace Period</span>
-            <span className={styles.statValue}>{loading ? '-' : stats.gracePeriod}</span>
+          <div className={styles.statusGraph}>
+            {statusRows.map(row => (
+              <button
+                type="button"
+                className={`${styles.statusRow} ${activeStatus === row.status ? styles.statusRowActive : ''}`}
+                key={row.status}
+                onClick={() => setActiveStatus(row.status)}
+              >
+                <div className={styles.statusMeta}>
+                  <span>{row.status}</span>
+                  <strong>{row.count}</strong>
+                </div>
+                <div className={styles.progressTrack}>
+                  <span style={{ width: `${row.percent}%`, background: row.color }}></span>
+                </div>
+              </button>
+            ))}
           </div>
-          <a href="/policies?filter=Grace Period" className={styles.cardLink}></a>
-        </div>
+        </section>
 
-        <div className={`${styles.bentoCard} ${styles.tableCard}`}>
-          <div className={styles.cardHeader}>
-            <h2>Upcoming Renewals</h2>
-            <a href="/policies" className={styles.viewAll}>View All</a>
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2><RenewalIcon />Renewal Timeline</h2>
+            <span>Open policies</span>
           </div>
-          <div className={styles.tableWrapper}>
-            {loading ? (
-              <div className={styles.loadingState}>Loading...</div>
-            ) : upcomingPolicies.length === 0 ? (
-              <div className={styles.emptyState}>No upcoming renewals</div>
-            ) : (
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Client</th>
-                    <th>Policy</th>
-                    <th>Due</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {upcomingPolicies.map(policy => {
-                    const days = getDaysUntilDue(policy.due_date);
-                    return (
-                      <tr key={policy.id}>
-                        <td className={styles.clientCell}>
-                          <div className={styles.clientAvatar}>{policy.client_name.charAt(0)}</div>
-                          <span>{policy.client_name}</span>
-                        </td>
-                        <td>{policy.policy_number}</td>
-                        <td>
-                          <span className={days <= 7 ? styles.urgent : days <= 30 ? styles.soon : ''}>
-                            {formatDate(policy.due_date)}
-                            {days > 0 && <small> in {days}d</small>}
-                            {days < 0 && <small className={styles.overdueText}> Overdue</small>}
-                          </span>
-                        </td>
-                        <td>{formatCurrency(policy.premium_amount)}</td>
-                        <td>
-                          <span className={`${styles.badge} ${styles[`badge${policy.status.replace(' ', '')}`]}`}>
-                            {policy.status}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
+          <div className={styles.barGraph}>
+            {renewalBuckets.map(bucket => (
+              <div className={styles.barItem} key={bucket.label}>
+                <div className={styles.barWrap}>
+                  <span style={{ height: `${Math.max(8, bucket.percent)}%` }}></span>
+                </div>
+                <strong>{bucket.count}</strong>
+                <small>{bucket.label}</small>
+              </div>
+            ))}
           </div>
-        </div>
+        </section>
 
-        <div className={`${styles.bentoCard} ${styles.quickActionsCard}`}>
-          <h2>Quick Actions</h2>
-          <div className={styles.actionsGrid}>
-            <a href="/policies/new" className={styles.actionBtn}>
-              <AddIcon />
-              <span>Add Policy</span>
-            </a>
-            <a href="/clients/new" className={styles.actionBtn}>
-              <ClientIcon />
-              <span>Add Client</span>
-            </a>
-            <a href="/policies/import" className={styles.actionBtn}>
-              <ImportIcon />
-              <span>Import CSV</span>
-            </a>
-            <a href="/interactions" className={styles.actionBtn}>
-              <LogIcon />
-              <span>View Logs</span>
-            </a>
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2><PortfolioIcon />Premium by Status</h2>
+            <span>{formatCurrency(metrics.totalPremium)}</span>
           </div>
-        </div>
+          <div className={styles.statusPanel} aria-label="Premium by status filters">
+            {statusPanelRows.map(row => (
+              <button
+                key={row.status}
+                type="button"
+                className={`${styles.statusButton} ${activeStatus === row.status ? styles.statusButtonActive : ''}`}
+                style={{ '--status-color': row.color }}
+                onClick={() => setActiveStatus(row.status)}
+              >
+                <span className={styles.statusCardIcon}>{getStatusCardIcon(row.status)}</span>
+                <span className={styles.statusButtonInfo}>
+                  <span className={styles.statusButtonTop}>{row.status}</span>
+                  <strong>{loading ? '-' : row.count}</strong>
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className={styles.valueList}>
+            {visibleStatusRows.map(row => (
+              <div className={styles.valueItem} key={row.status}>
+                <span><i style={{ background: row.color }}></i>{row.status}</span>
+                <strong>{formatCurrency(row.premium)}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        <div className={`${styles.bentoCard} ${styles.chartCard}`}>
-          <h2>Policy Status</h2>
-          <div className={styles.chartPlaceholder}>
-            <div className={styles.donutChart}>
-              <svg viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" strokeWidth="12"/>
-                {stats.total > 0 && (
-                  <>
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="12"
-                      strokeDasharray={`${(stats.paid / stats.total) * 251.2} 251.2`}
-                      transform="rotate(-90 50 50)"/>
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" strokeWidth="12"
-                      strokeDasharray={`${(stats.pendingRenewals / stats.total) * 251.2} 251.2`}
-                      strokeDashoffset={`-${(stats.paid / stats.total) * 251.2}`}
-                      transform="rotate(-90 50 50)"/>
-                  </>
-                )}
-                <text x="50" y="45" textAnchor="middle" className={styles.chartTotal}>{stats.total}</text>
-                <text x="50" y="58" textAnchor="middle" className={styles.chartLabel}>Total</text>
-              </svg>
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <h2><InsightIcon />Important Data</h2>
+            <span>Action signals</span>
+          </div>
+          <div className={styles.insightList}>
+            <div>
+              <strong>{stats.overdue}</strong>
+              <span>Overdue policies need immediate follow-up.</span>
             </div>
-            <div className={styles.legend}>
-              <div className={styles.legendItem}>
-                <span className={styles.legendDot} style={{background: '#22c55e'}}></span>
-                <span>Paid ({stats.paid})</span>
-              </div>
-              <div className={styles.legendItem}>
-                <span className={styles.legendDot} style={{background: '#f59e0b'}}></span>
-                <span>Pending ({stats.pendingRenewals})</span>
-              </div>
-              <div className={styles.legendItem}>
-                <span className={styles.legendDot} style={{background: '#6366f1'}}></span>
-                <span>Grace Period ({stats.gracePeriod})</span>
-              </div>
+            <div>
+              <strong>{stats.gracePeriod}</strong>
+              <span>Grace-period policies should be prioritized today.</span>
+            </div>
+            <div>
+              <strong>{stats.lapsed}</strong>
+              <span>Lapsed policies may need recovery or fresh onboarding.</span>
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
 }
 
-const TotalIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+function getStatusCardIcon(status) {
+  const icons = {
+    All: <PolicyTotalIcon />,
+    Paid: <PolicyPaidIcon />,
+    Pending: <PolicyPendingIcon />,
+    Overdue: <PolicyOverdueIcon />,
+    'Grace Period': <PolicyGraceIcon />,
+    Lapsed: <PolicyLapsedIcon />
+  };
+
+  return icons[status] || <StatusIcon />;
+}
+
+function MetricCard({ icon, label, value, hint, tone, href }) {
+  const content = (
+    <>
+      <span className={styles.metricIcon}>{icon}</span>
+      <span className={styles.metricLabel}>{label}</span>
+      <strong className={styles.metricValue}>{value}</strong>
+      <span className={styles.metricHint}>{hint}</span>
+    </>
+  );
+
+  if (href) {
+    return <Link href={href} className={`${styles.metricCard} ${styles[tone]}`}>{content}</Link>;
+  }
+
+  return <div className={`${styles.metricCard} ${styles[tone]}`}>{content}</div>;
+}
+
+const PortfolioIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M3 21h18"/>
+    <path d="M5 21V7l8-4v18"/>
+    <path d="M19 21V11l-6-4"/>
+    <path d="M9 9h1M9 13h1M9 17h1"/>
+  </svg>
+);
+
+const RenewalIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="4" width="18" height="18" rx="2"/>
+    <path d="M16 2v4M8 2v4M3 10h18"/>
+    <path d="M9 16h6"/>
+  </svg>
+);
+
+const PolicyTotalIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
     <polyline points="14,2 14,8 20,8"/>
   </svg>
 );
 
-const PendingIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+const PolicyPendingIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <circle cx="12" cy="12" r="10"/>
     <polyline points="12,6 12,12 16,14"/>
   </svg>
 );
 
-const PaidIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+const PolicyPaidIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
     <polyline points="22,4 12,14.01 9,11.01"/>
   </svg>
 );
 
-const GraceIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+const PolicyOverdueIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M12 9v4"/>
+    <path d="M12 17h.01"/>
     <circle cx="12" cy="12" r="10"/>
-    <polyline points="12,6 12,12 16,14"/>
   </svg>
 );
 
-const AddIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10"/>
-    <line x1="12" y1="8" x2="12" y2="16"/>
-    <line x1="8" y1="12" x2="16" y2="12"/>
+const PolicyGraceIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M12 2v4"/>
+    <path d="M12 18v4"/>
+    <path d="M4.93 4.93l2.83 2.83"/>
+    <path d="M16.24 16.24l2.83 2.83"/>
+    <circle cx="12" cy="12" r="4"/>
   </svg>
 );
 
-const ClientIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
+const PolicyLapsedIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M10 2h4"/>
+    <path d="M12 14l4-4"/>
+    <circle cx="12" cy="14" r="8"/>
   </svg>
 );
 
-const ImportIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-    <polyline points="17,8 12,3 7,8"/>
-    <line x1="12" y1="3" x2="12" y2="15"/>
+const StatusIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M4 6h16M4 12h10M4 18h7"/>
   </svg>
 );
 
-const LogIcon = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-    <polyline points="14,2 14,8 20,8"/>
+const InsightIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M9 18h6"/>
+    <path d="M10 22h4"/>
+    <path d="M12 2a7 7 0 0 0-4 12.74V17h8v-2.26A7 7 0 0 0 12 2z"/>
   </svg>
 );
