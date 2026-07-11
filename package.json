@@ -9,5 +9,9 @@
     "start": "cd frontend && npm run start",
     "lint": "cd frontend && npm run lint"
   },
-  "dependencies": {}
+  "dependencies": {
+    "next": "^16.2.10",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
 }
