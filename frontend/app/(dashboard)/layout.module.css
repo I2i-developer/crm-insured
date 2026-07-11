@@ -463,6 +463,32 @@
   border-bottom: 1px solid var(--line);
 }
 
+.notificationList {
+  max-height: min(420px, calc(100vh - 210px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.notificationList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.notificationList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notificationList::-webkit-scrollbar-thumb {
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.notificationList::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 .notificationItem:last-child {
   border-bottom: 0;
 }
@@ -852,6 +878,10 @@
     left: 0;
     right: auto;
     width: min(330px, 100%);
+  }
+
+  .notificationList {
+    max-height: min(380px, calc(100vh - 260px));
   }
 
   .searchMenu {

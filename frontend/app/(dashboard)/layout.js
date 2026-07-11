@@ -140,8 +140,7 @@ function buildReminders(policies = [], leads = []) {
   });
 
   return reminders
-    .sort((a, b) => reminderWeight(a.type) - reminderWeight(b.type) || a.days - b.days)
-    .slice(0, 12);
+    .sort((a, b) => reminderWeight(a.type) - reminderWeight(b.type) || a.days - b.days);
 }
 
 export default function DashboardLayout({ children }) {
@@ -574,33 +573,35 @@ export default function DashboardLayout({ children }) {
                       </button>
                     </div>
                   )}
-                  {notificationLoading ? (
-                    <div className={styles.notificationEmpty}>Loading reminders...</div>
-                  ) : reminders.length > 0 ? reminders.map(reminder => (
-                    <div
-                      className={`${styles.notificationItem} ${readReminderIds.includes(reminder.id) ? styles.notificationItemRead : ''}`}
-                      key={reminder.id}
-                    >
-                      <Link href={reminder.href} className={styles.notificationContent} onClick={() => markReminderAsRead(reminder.id)}>
-                        <ReminderIcon type={reminder.icon} />
-                        <span>
-                          <strong>{reminder.title}</strong>
-                          <small>{reminder.message}</small>
-                          <em>{reminder.meta}</em>
-                        </span>
-                      </Link>
-                      <button
-                        type="button"
-                        className={styles.markReadButton}
-                        onClick={() => markReminderAsRead(reminder.id)}
-                        disabled={readReminderIds.includes(reminder.id)}
+                  <div className={styles.notificationList}>
+                    {notificationLoading ? (
+                      <div className={styles.notificationEmpty}>Loading reminders...</div>
+                    ) : reminders.length > 0 ? reminders.map(reminder => (
+                      <div
+                        className={`${styles.notificationItem} ${readReminderIds.includes(reminder.id) ? styles.notificationItemRead : ''}`}
+                        key={reminder.id}
                       >
-                        {readReminderIds.includes(reminder.id) ? 'Read' : 'Mark read'}
-                      </button>
-                    </div>
-                  )) : (
-                    <div className={styles.notificationEmpty}>No urgent reminders right now.</div>
-                  )}
+                        <Link href={reminder.href} className={styles.notificationContent} onClick={() => markReminderAsRead(reminder.id)}>
+                          <ReminderIcon type={reminder.icon} />
+                          <span>
+                            <strong>{reminder.title}</strong>
+                            <small>{reminder.message}</small>
+                            <em>{reminder.meta}</em>
+                          </span>
+                        </Link>
+                        <button
+                          type="button"
+                          className={styles.markReadButton}
+                          onClick={() => markReminderAsRead(reminder.id)}
+                          disabled={readReminderIds.includes(reminder.id)}
+                        >
+                          {readReminderIds.includes(reminder.id) ? 'Read' : 'Mark read'}
+                        </button>
+                      </div>
+                    )) : (
+                      <div className={styles.notificationEmpty}>No urgent reminders right now.</div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
