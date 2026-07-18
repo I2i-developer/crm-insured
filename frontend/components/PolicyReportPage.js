@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
+import { POLICY_DISCOUNT_TYPES, POLICY_STATUSES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
 import styles from './policy-report.module.css';
 
@@ -29,6 +30,35 @@ function startOfToday() {
 
 function getPolicyPaymentDate(policy) {
   return policy.payment_due_date || policy.due_date;
+}
+
+function getPolicyDateByType(policy, type) {
+  if (type === 'issuance') return policy.issuance_date;
+  if (type === 'payment') return getPolicyPaymentDate(policy);
+  return policy.due_date;
+}
+
+function parseFilterAmount(value) {
+  if (value === '' || value === null || value === undefined) return null;
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function isDateWithinRange(value, from, to) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return false;
+
+  if (from) {
+    const start = new Date(`${from}T00:00:00`);
+    if (!Number.isNaN(start.getTime()) && date < start) return false;
+  }
+
+  if (to) {
+    const end = new Date(`${to}T23:59:59`);
+    if (!Number.isNaN(end.getTime()) && date > end) return false;
+  }
+
+  return true;
 }
 
 function statusClass(status) {
@@ -59,6 +89,20 @@ export default function PolicyReportPage({
   const [search, setSearch] = useState('');
   const [company, setCompany] = useState('');
   const [range, setRange] = useState(daysAhead);
+  const [advancedFilters, setAdvancedFilters] = useState({
+    status: '',
+    policyNumber: '',
+    planName: '',
+    discountType: '',
+    dateType: 'due',
+    dateFrom: '',
+    dateTo: '',
+    premiumFrom: '',
+    premiumTo: '',
+    sumInsuredFrom: '',
+    sumInsuredTo: ''
+  });
+  const showAdvancedFilters = mode === 'all';
 
   const query = useMemo(() => {
     const today = new Date();
@@ -72,7 +116,7 @@ export default function PolicyReportPage({
 
     if (search) params.set('search', search);
     if (company) params.set('company', company);
-    if (status) params.set('status', status);
+    if (status || advancedFilters.status) params.set('status', status || advancedFilters.status);
 
     if (mode === 'expired') {
       params.set('due_date_to', toDateInput(new Date(today.getTime() - DAY_MS)));
@@ -84,7 +128,7 @@ export default function PolicyReportPage({
     }
 
     return params.toString();
-  }, [company, mode, range, search, status]);
+  }, [advancedFilters.status, company, mode, range, search, status]);
 
   useEffect(() => {
     let active = true;
@@ -129,13 +173,63 @@ export default function PolicyReportPage({
       });
     }
 
-    if (!['expired', 'upcomingExpiry'].includes(mode)) return policies;
-    return policies.filter(policy => !isPolicyClosed(policy));
-  }, [mode, policies, range]);
+    const basePolicies = !['expired', 'upcomingExpiry'].includes(mode)
+      ? policies
+      : policies.filter(policy => !isPolicyClosed(policy));
+
+    if (!showAdvancedFilters) return basePolicies;
+
+    const premiumFrom = parseFilterAmount(advancedFilters.premiumFrom);
+    const premiumTo = parseFilterAmount(advancedFilters.premiumTo);
+    const sumInsuredFrom = parseFilterAmount(advancedFilters.sumInsuredFrom);
+    const sumInsuredTo = parseFilterAmount(advancedFilters.sumInsuredTo);
+    const policyNumber = advancedFilters.policyNumber.trim().toLowerCase();
+    const planName = advancedFilters.planName.trim().toLowerCase();
+
+    return basePolicies.filter(policy => {
+      if (policyNumber && !String(policy.policy_number || '').toLowerCase().includes(policyNumber)) return false;
+      if (planName && !String(policy.plan_name || '').toLowerCase().includes(planName)) return false;
+      if (advancedFilters.discountType) {
+        const discount = policy.discount_type || 'none';
+        if (advancedFilters.discountType !== discount) return false;
+      }
+      if (advancedFilters.dateFrom || advancedFilters.dateTo) {
+        if (!isDateWithinRange(getPolicyDateByType(policy, advancedFilters.dateType), advancedFilters.dateFrom, advancedFilters.dateTo)) {
+          return false;
+        }
+      }
+
+      const premium = Number(policy.premium_amount || 0);
+      if (premiumFrom !== null && premium < premiumFrom) return false;
+      if (premiumTo !== null && premium > premiumTo) return false;
+
+      const sumInsured = policy.sum_insured === null || policy.sum_insured === undefined ? null : Number(policy.sum_insured);
+      if (sumInsuredFrom !== null && (sumInsured === null || sumInsured < sumInsuredFrom)) return false;
+      if (sumInsuredTo !== null && (sumInsured === null || sumInsured > sumInsuredTo)) return false;
+
+      return true;
+    });
+  }, [advancedFilters, mode, policies, range, showAdvancedFilters]);
 
   const companies = useMemo(() => {
     return [...new Set(policies.map(policy => policy.insurance_company).filter(Boolean))].sort();
   }, [policies]);
+
+  const clearAdvancedFilters = () => {
+    setAdvancedFilters({
+      status: '',
+      policyNumber: '',
+      planName: '',
+      discountType: '',
+      dateType: 'due',
+      dateFrom: '',
+      dateTo: '',
+      premiumFrom: '',
+      premiumTo: '',
+      sumInsuredFrom: '',
+      sumInsuredTo: ''
+    });
+  };
 
   const totalPremium = filteredPolicies.reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
   const pendingCount = filteredPolicies.filter(policy => policy.status === 'Pending').length;
@@ -186,6 +280,12 @@ export default function PolicyReportPage({
             <option value="">All companies</option>
             {companies.map(item => <option key={item} value={item}>{item}</option>)}
           </select>
+          {showAdvancedFilters && !status && (
+            <select className={styles.select} value={advancedFilters.status} onChange={event => setAdvancedFilters(prev => ({ ...prev, status: event.target.value }))}>
+              <option value="">All statuses</option>
+              {POLICY_STATUSES.map(item => <option key={item} value={item}>{item}</option>)}
+            </select>
+          )}
           {(mode === 'upcomingExpiry' || mode === 'upcomingPayment') && (
             <select className={styles.select} value={range} onChange={event => setRange(event.target.value)}>
               <option value="7">Next 7 days</option>
@@ -195,6 +295,81 @@ export default function PolicyReportPage({
             </select>
           )}
         </div>
+        {showAdvancedFilters && (
+          <div className={styles.advancedFilters}>
+            <input
+              className={styles.input}
+              value={advancedFilters.policyNumber}
+              onChange={event => setAdvancedFilters(prev => ({ ...prev, policyNumber: event.target.value }))}
+              placeholder="Policy number"
+            />
+            <input
+              className={styles.input}
+              value={advancedFilters.planName}
+              onChange={event => setAdvancedFilters(prev => ({ ...prev, planName: event.target.value }))}
+              placeholder="Plan name"
+            />
+            <select className={styles.select} value={advancedFilters.discountType} onChange={event => setAdvancedFilters(prev => ({ ...prev, discountType: event.target.value }))}>
+              <option value="">All discounts</option>
+              <option value="none">No discount</option>
+              {POLICY_DISCOUNT_TYPES.map(item => <option key={item} value={item}>{item}</option>)}
+            </select>
+            <select className={styles.select} value={advancedFilters.dateType} onChange={event => setAdvancedFilters(prev => ({ ...prev, dateType: event.target.value }))}>
+              <option value="due">Due date</option>
+              <option value="issuance">Issuance date</option>
+              <option value="payment">Payment due date</option>
+            </select>
+            <input
+              className={styles.input}
+              type="date"
+              value={advancedFilters.dateFrom}
+              onChange={event => setAdvancedFilters(prev => ({ ...prev, dateFrom: event.target.value }))}
+              aria-label="Date from"
+            />
+            <input
+              className={styles.input}
+              type="date"
+              value={advancedFilters.dateTo}
+              onChange={event => setAdvancedFilters(prev => ({ ...prev, dateTo: event.target.value }))}
+              aria-label="Date to"
+            />
+            <input
+              className={styles.input}
+              type="number"
+              min="0"
+              value={advancedFilters.premiumFrom}
+              onChange={event => setAdvancedFilters(prev => ({ ...prev, premiumFrom: event.target.value }))}
+              placeholder="Premium min"
+            />
+            <input
+              className={styles.input}
+              type="number"
+              min="0"
+              value={advancedFilters.premiumTo}
+              onChange={event => setAdvancedFilters(prev => ({ ...prev, premiumTo: event.target.value }))}
+              placeholder="Premium max"
+            />
+            <input
+              className={styles.input}
+              type="number"
+              min="0"
+              value={advancedFilters.sumInsuredFrom}
+              onChange={event => setAdvancedFilters(prev => ({ ...prev, sumInsuredFrom: event.target.value }))}
+              placeholder="Sum insured min"
+            />
+            <input
+              className={styles.input}
+              type="number"
+              min="0"
+              value={advancedFilters.sumInsuredTo}
+              onChange={event => setAdvancedFilters(prev => ({ ...prev, sumInsuredTo: event.target.value }))}
+              placeholder="Sum insured max"
+            />
+            <button type="button" className={styles.clearFiltersBtn} onClick={clearAdvancedFilters}>
+              Clear filters
+            </button>
+          </div>
+        )}
       </section>
 
       <div className={styles.tableCard}>

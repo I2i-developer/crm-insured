@@ -7,6 +7,11 @@ export const DEFAULT_POLICY_TYPE = 'Health Insurance';
 export const LEAD_STAGES = ['New', 'Contacted', 'Qualified', 'Proposal', 'Converted', 'Lost'];
 export const LEAD_PRIORITIES = ['Low', 'Medium', 'High'];
 
+function normalizeInsuranceCompany(value) {
+  const company = cleanString(value, 160);
+  return company.toLowerCase() === 'hdfc' ? 'HDFC Ergo' : company;
+}
+
 export function cleanString(value, maxLength = 500) {
   if (typeof value !== 'string') return '';
   return value.trim().slice(0, maxLength);
@@ -68,7 +73,7 @@ export function validatePolicyInput(input, { partial = false } = {}) {
 
   if (input.client_name !== undefined) policy.client_name = cleanString(input.client_name, 160);
   if (input.policy_type !== undefined) policy.policy_type = cleanString(input.policy_type, 120) || DEFAULT_POLICY_TYPE;
-  if (input.insurance_company !== undefined) policy.insurance_company = cleanString(input.insurance_company, 160);
+  if (input.insurance_company !== undefined) policy.insurance_company = normalizeInsuranceCompany(input.insurance_company);
   if (input.policy_number !== undefined) policy.policy_number = cleanString(String(input.policy_number), 80);
   if (input.plan_name !== undefined) policy.plan_name = cleanString(input.plan_name, 160) || null;
 

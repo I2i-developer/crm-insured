@@ -18,6 +18,29 @@ const STATUS_COLORS = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const CLOSED_STATUSES = ['Paid', 'Renew Done'];
+
+function getPolicyBusinessDate(policy) {
+  const date = new Date(policy.issuance_date || policy.created_at || policy.due_date);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function isInDateRange(policy, dateFrom, dateTo) {
+  const date = getPolicyBusinessDate(policy);
+  if (!date) return false;
+
+  if (dateFrom) {
+    const start = new Date(`${dateFrom}T00:00:00`);
+    if (!Number.isNaN(start.getTime()) && date < start) return false;
+  }
+
+  if (dateTo) {
+    const end = new Date(`${dateTo}T23:59:59`);
+    if (!Number.isNaN(end.getTime()) && date > end) return false;
+  }
+
+  return true;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -27,6 +50,7 @@ export default function DashboardPage() {
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeStatus, setActiveStatus] = useState('All');
+  const [dashboardFilters, setDashboardFilters] = useState({ dateFrom: '', dateTo: '' });
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -66,42 +90,62 @@ export default function DashboardPage() {
     }
   };
 
+  const filteredPolicies = useMemo(() => {
+    if (!dashboardFilters.dateFrom && !dashboardFilters.dateTo) return policies;
+    return policies.filter(policy => isInDateRange(policy, dashboardFilters.dateFrom, dashboardFilters.dateTo));
+  }, [dashboardFilters, policies]);
+
   const metrics = useMemo(() => {
-    const totalPremium = policies.reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
-    const paidPremium = policies
-      .filter(policy => policy.status === 'Paid' || policy.status === 'Renew Done')
+    const activePortfolioPolicies = filteredPolicies.filter(policy => policy.status !== 'Lapsed');
+    const totalPremium = activePortfolioPolicies.reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
+    const paidPremium = filteredPolicies
+      .filter(policy => CLOSED_STATUSES.includes(policy.status))
       .reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const dueInSeven = policies.filter(policy => {
+    const dueInSeven = filteredPolicies.filter(policy => {
       const due = new Date(policy.due_date);
-      return !['Paid', 'Renew Done'].includes(policy.status) && due >= today && due <= new Date(today.getTime() + 7 * DAY_MS);
+      return !CLOSED_STATUSES.includes(policy.status) && due >= today && due <= new Date(today.getTime() + 7 * DAY_MS);
     }).length;
 
-    const overdueValue = policies
-      .filter(policy => !['Paid', 'Renew Done'].includes(policy.status) && (policy.status === 'Overdue' || new Date(policy.due_date) < today))
+    const overdueValue = filteredPolicies
+      .filter(policy => !CLOSED_STATUSES.includes(policy.status) && policy.status !== 'Lapsed' && (policy.status === 'Overdue' || new Date(policy.due_date) < today))
       .reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
 
-    const closedCount = (stats.paid || 0) + (stats.renewDone || 0);
-    const paidRate = stats.total ? Math.round((closedCount / stats.total) * 100) : 0;
-    const riskCount = stats.overdue + stats.gracePeriod + stats.lapsed;
+    const filteredCounts = filteredPolicies.reduce((counts, policy) => {
+      counts.total += 1;
+      counts[policy.status] = (counts[policy.status] || 0) + 1;
+      return counts;
+    }, { total: 0 });
+    const closedCount = (filteredCounts.Paid || 0) + (filteredCounts['Renew Done'] || 0);
+    const activeCount = activePortfolioPolicies.length;
+    const paidRate = activeCount ? Math.round((closedCount / activeCount) * 100) : 0;
+    const riskCount = (filteredCounts.Overdue || 0) + (filteredCounts['Grace Period'] || 0) + (filteredCounts.Lapsed || 0);
 
-    return { totalPremium, paidPremium, dueInSeven, overdueValue, paidRate, riskCount };
-  }, [policies, stats]);
+    return {
+      totalPremium,
+      paidPremium,
+      dueInSeven,
+      overdueValue,
+      paidRate,
+      riskCount,
+      activeCount,
+      portfolioCount: activePortfolioPolicies.length,
+      counts: filteredCounts
+    };
+  }, [filteredPolicies]);
 
   const statusRows = STATUS_ORDER.map(status => {
-    const count = status === 'Pending'
-      ? stats.pendingRenewals
-      : stats[status === 'Grace Period' ? 'gracePeriod' : status === 'Renew Done' ? 'renewDone' : status.toLowerCase()] || 0;
-    const percent = stats.total ? Math.round((count / stats.total) * 100) : 0;
-    const premium = policies
+    const count = metrics.counts?.[status] || 0;
+    const percent = metrics.counts?.total ? Math.round((count / metrics.counts.total) * 100) : 0;
+    const premium = filteredPolicies
       .filter(policy => policy.status === status)
       .reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
     return { status, count, percent, premium, color: STATUS_COLORS[status] };
   });
   const statusPanelRows = [
-    { status: 'All', count: stats.total || 0, percent: 100, premium: metrics.totalPremium, color: 'var(--primary)' },
+    { status: 'All', count: metrics.counts?.total || 0, percent: 100, premium: metrics.totalPremium, color: 'var(--primary)' },
     ...statusRows
   ];
   const visibleStatusRows = activeStatus === 'All' ? statusRows : statusRows.filter(row => row.status === activeStatus);
@@ -117,8 +161,8 @@ export default function DashboardPage() {
       { label: '30+ days', min: 31, max: Infinity, count: 0 }
     ];
 
-    policies
-      .filter(policy => !['Paid', 'Renew Done'].includes(policy.status))
+    filteredPolicies
+      .filter(policy => !CLOSED_STATUSES.includes(policy.status))
       .forEach(policy => {
         const due = new Date(policy.due_date);
         due.setHours(0, 0, 0, 0);
@@ -129,7 +173,7 @@ export default function DashboardPage() {
 
     const max = Math.max(1, ...buckets.map(bucket => bucket.count));
     return buckets.map(bucket => ({ ...bucket, percent: Math.round((bucket.count / max) * 100) }));
-  }, [policies]);
+  }, [filteredPolicies]);
 
   if (!user) {
     return (
@@ -152,6 +196,7 @@ export default function DashboardPage() {
     ? 'Good Afternoon'
     : 'Good Evening';
   const firstName = (user.name || 'User').trim().split(/\s+/)[0];
+  const hasDashboardFilters = Boolean(dashboardFilters.dateFrom || dashboardFilters.dateTo);
   const roleView = {
     super_admin: {
       description: 'Full CRM governance view for testing, user access, audit tracking, and health policy operations.',
@@ -192,7 +237,7 @@ export default function DashboardPage() {
       <section className={styles.summaryPanel}>
         <div>
           <span className={styles.eyebrow}>{roleView.eyebrow}</span>
-          <h2>{loading ? 'Loading portfolio...' : `${stats.total} ${roleView.totalLabel}`}</h2>
+          <h2>{loading ? 'Loading portfolio...' : `${metrics.activeCount} ${roleView.totalLabel}`}</h2>
           <p>
             {metrics.riskCount > 0
               ? `${metrics.riskCount} policies need attention across overdue, grace, or lapsed stages.`
@@ -206,10 +251,48 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      <section className={styles.dashboardFilterPanel}>
+        <div>
+          <span className={styles.eyebrow}>Dashboard Filters</span>
+          <h2>Card date range</h2>
+        </div>
+        <div className={styles.dashboardFilters}>
+          <label>
+            <span>From</span>
+            <input
+              type="date"
+              value={dashboardFilters.dateFrom}
+              onChange={event => setDashboardFilters(prev => ({ ...prev, dateFrom: event.target.value }))}
+            />
+          </label>
+          <label>
+            <span>To</span>
+            <input
+              type="date"
+              value={dashboardFilters.dateTo}
+              onChange={event => setDashboardFilters(prev => ({ ...prev, dateTo: event.target.value }))}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setDashboardFilters({ dateFrom: '', dateTo: '' })}
+            disabled={!hasDashboardFilters}
+          >
+            Clear
+          </button>
+        </div>
+      </section>
+
       <div className={styles.statGrid}>
-        <MetricCard icon={<PolicyTotalIcon />} label="Portfolio Value" value={loading ? '-' : formatCurrency(metrics.totalPremium)} hint={`${stats.total || 0} active records`} tone="primary" />
-        <MetricCard icon={<PolicyPaidIcon />} label="Paid Premium" value={loading ? '-' : formatCurrency(metrics.paidPremium)} hint={`${metrics.paidRate}% collected`} tone="success" />
-        <MetricCard icon={<PolicyPendingIcon />} label="Pending Renewals" value={loading ? '-' : stats.pendingRenewals} hint={`${metrics.dueInSeven} due in 7 days`} tone="warning" href="/upcoming-renewals" />
+        <MetricCard
+          icon={<PolicyTotalIcon />}
+          label="Portfolio Value"
+          value={loading ? '-' : formatCurrency(metrics.totalPremium)}
+          hint={`${metrics.portfolioCount || 0} active records, lapsed excluded`}
+          tone="primary"
+        />
+        <MetricCard icon={<PolicyPaidIcon />} label="Paid Premium" value={loading ? '-' : formatCurrency(metrics.paidPremium)} hint={`${metrics.paidRate}% collected in range`} tone="success" />
+        <MetricCard icon={<PolicyPendingIcon />} label="Pending Renewals" value={loading ? '-' : (metrics.counts?.Pending || 0)} hint={`${metrics.dueInSeven} due in 7 days`} tone="warning" href="/upcoming-renewals" />
         <MetricCard icon={<PolicyOverdueIcon />} label="Risk Queue" value={loading ? '-' : metrics.riskCount} hint={formatCurrency(metrics.overdueValue)} tone="danger" href="/expired-policies" />
       </div>
 
@@ -217,7 +300,7 @@ export default function DashboardPage() {
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
             <h2><StatusIcon />Status Distribution</h2>
-            <span>{stats.total || 0} total</span>
+            <span>{metrics.counts?.total || 0} total</span>
           </div>
           <div className={styles.statusGraph}>
             {statusRows.map(row => (
@@ -296,15 +379,15 @@ export default function DashboardPage() {
           </div>
           <div className={styles.insightList}>
             <div>
-              <strong>{stats.overdue}</strong>
+              <strong>{metrics.counts?.Overdue || 0}</strong>
               <span>Overdue policies need immediate follow-up.</span>
             </div>
             <div>
-              <strong>{stats.gracePeriod}</strong>
+              <strong>{metrics.counts?.['Grace Period'] || 0}</strong>
               <span>Grace-period policies should be prioritized today.</span>
             </div>
             <div>
-              <strong>{stats.lapsed}</strong>
+              <strong>{metrics.counts?.Lapsed || 0}</strong>
               <span>Lapsed policies may need recovery or fresh onboarding.</span>
             </div>
           </div>

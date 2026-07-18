@@ -160,7 +160,7 @@ export default function ImportPoliciesPage() {
         <p>Use this template to ensure your data is formatted correctly:</p>
         <button onClick={() => {
           const headers = ['client_name', 'policy_type', 'insurance_company', 'policy_number', 'plan_name', 'premium_amount', 'sum_insured', 'renewal_years', 'discount_type', 'due_date', 'payment_due_date', 'issuance_date', 'phone', 'email'];
-          const sampleRow = ['John Doe', 'Health Insurance', 'HDFC', 'POL-001', 'Optima Secure', '1500.00', '500000', '1', 'Family discount', '2026-05-15', '2026-05-01', '2025-05-15', '+919876543210', 'john@example.com'];
+          const sampleRow = ['John Doe', 'Health Insurance', 'HDFC Ergo', 'POL-001', 'Optima Secure', '1500.00', '500000', '1', 'Family discount', '2026-05-15', '2026-05-01', '2025-05-15', '+919876543210', 'john@example.com'];
           const csv = [headers.join(','), sampleRow.join(',')].join('\n');
           const blob = new Blob([csv], { type: 'text/csv' });
           const url = URL.createObjectURL(blob);

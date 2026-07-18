@@ -66,7 +66,9 @@ export default function ManageClientsPage() {
 
       existing.policies += 1;
       existing.activePolicies += ['Paid', 'Renew Done', 'Pending'].includes(policy.status) ? 1 : 0;
-      existing.premium += Number(policy.premium_amount || 0);
+      if (policy.status !== 'Lapsed') {
+        existing.premium += Number(policy.premium_amount || 0);
+      }
       existing.latestStatus = policy.status;
 
       const dueDate = new Date(policy.due_date);
