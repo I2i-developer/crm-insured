@@ -7,9 +7,10 @@ import { api } from '@/lib/api';
 import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
-const STATUS_ORDER = ['Paid', 'Pending', 'Overdue', 'Grace Period', 'Lapsed'];
+const STATUS_ORDER = ['Paid', 'Renew Done', 'Pending', 'Overdue', 'Grace Period', 'Lapsed'];
 const STATUS_COLORS = {
   Paid: '#16a34a',
+  'Renew Done': '#2563eb',
   Pending: '#eab308',
   Overdue: '#ef4444',
   'Grace Period': '#0ea5b7',
@@ -22,7 +23,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const toast = useToast();
   const [user, setUser] = useState(null);
-  const [stats, setStats] = useState({ total: 0, pendingRenewals: 0, paid: 0, overdue: 0, gracePeriod: 0, lapsed: 0 });
+  const [stats, setStats] = useState({ total: 0, pendingRenewals: 0, paid: 0, renewDone: 0, overdue: 0, gracePeriod: 0, lapsed: 0 });
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeStatus, setActiveStatus] = useState('All');
@@ -68,28 +69,31 @@ export default function DashboardPage() {
   const metrics = useMemo(() => {
     const totalPremium = policies.reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
     const paidPremium = policies
-      .filter(policy => policy.status === 'Paid')
+      .filter(policy => policy.status === 'Paid' || policy.status === 'Renew Done')
       .reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const dueInSeven = policies.filter(policy => {
       const due = new Date(policy.due_date);
-      return policy.status !== 'Paid' && due >= today && due <= new Date(today.getTime() + 7 * DAY_MS);
+      return !['Paid', 'Renew Done'].includes(policy.status) && due >= today && due <= new Date(today.getTime() + 7 * DAY_MS);
     }).length;
 
     const overdueValue = policies
-      .filter(policy => policy.status === 'Overdue' || new Date(policy.due_date) < today)
+      .filter(policy => !['Paid', 'Renew Done'].includes(policy.status) && (policy.status === 'Overdue' || new Date(policy.due_date) < today))
       .reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
 
-    const paidRate = stats.total ? Math.round((stats.paid / stats.total) * 100) : 0;
+    const closedCount = (stats.paid || 0) + (stats.renewDone || 0);
+    const paidRate = stats.total ? Math.round((closedCount / stats.total) * 100) : 0;
     const riskCount = stats.overdue + stats.gracePeriod + stats.lapsed;
 
     return { totalPremium, paidPremium, dueInSeven, overdueValue, paidRate, riskCount };
   }, [policies, stats]);
 
   const statusRows = STATUS_ORDER.map(status => {
-    const count = status === 'Pending' ? stats.pendingRenewals : stats[status === 'Grace Period' ? 'gracePeriod' : status.toLowerCase()] || 0;
+    const count = status === 'Pending'
+      ? stats.pendingRenewals
+      : stats[status === 'Grace Period' ? 'gracePeriod' : status === 'Renew Done' ? 'renewDone' : status.toLowerCase()] || 0;
     const percent = stats.total ? Math.round((count / stats.total) * 100) : 0;
     const premium = policies
       .filter(policy => policy.status === status)
@@ -114,7 +118,7 @@ export default function DashboardPage() {
     ];
 
     policies
-      .filter(policy => policy.status !== 'Paid')
+      .filter(policy => !['Paid', 'Renew Done'].includes(policy.status))
       .forEach(policy => {
         const due = new Date(policy.due_date);
         due.setHours(0, 0, 0, 0);
@@ -141,27 +145,30 @@ export default function DashboardPage() {
     currency: 'INR',
     maximumFractionDigits: 0
   }).format(amount || 0);
+  const currentHour = new Date().getHours();
+  const greeting = currentHour < 12
+    ? 'Good Morning'
+    : currentHour < 17
+    ? 'Good Afternoon'
+    : 'Good Evening';
+  const firstName = (user.name || 'User').trim().split(/\s+/)[0];
   const roleView = {
     super_admin: {
-      title: 'SuperAdmin Dashboard',
       description: 'Full CRM governance view for testing, user access, audit tracking, and health policy operations.',
       eyebrow: 'System Summary',
       totalLabel: 'team health policies under management'
     },
     admin: {
-      title: 'Admin Team Dashboard',
       description: 'Team-head view for monitoring leads, renewals, payment risk, and agent follow-up priorities.',
       eyebrow: 'Team Summary',
       totalLabel: 'team health policies under management'
     },
     team_member: {
-      title: 'Agent Dashboard',
       description: 'Focused view of your assigned health policies, renewals, payment follow-ups, and action queue.',
       eyebrow: 'My Summary',
       totalLabel: 'health policies assigned to you'
     }
   }[user.role] || {
-    title: 'Executive Dashboard',
     description: 'Health policy portfolio summary, renewal risk, payment movement, and team action signals.',
     eyebrow: 'Executive Summary',
     totalLabel: 'health policies under management'
@@ -171,8 +178,11 @@ export default function DashboardPage() {
     <div className={styles.dashboard}>
       <header className={styles.header}>
         <div>
-          <h1>{roleView.title}</h1>
-          <p>{roleView.description}</p>
+          <h1 className={styles.greetingTitle}>
+            <span>{greeting},</span>
+            <strong>{firstName}</strong>
+          </h1>
+          <p className={styles.greetingCopy}>Welcome back.</p>
         </div>
         {/* <div className={styles.headerDate}>
           {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
@@ -308,6 +318,7 @@ function getStatusCardIcon(status) {
   const icons = {
     All: <PolicyTotalIcon />,
     Paid: <PolicyPaidIcon />,
+    'Renew Done': <PolicyRenewDoneIcon />,
     Pending: <PolicyPendingIcon />,
     Overdue: <PolicyOverdueIcon />,
     'Grace Period': <PolicyGraceIcon />,
@@ -369,6 +380,14 @@ const PolicyPaidIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
     <polyline points="22,4 12,14.01 9,11.01"/>
+  </svg>
+);
+
+const PolicyRenewDoneIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 12a9 9 0 1 1-2.64-6.36"/>
+    <path d="M21 4v6h-6"/>
+    <path d="M9 12l2 2 5-5"/>
   </svg>
 );
 

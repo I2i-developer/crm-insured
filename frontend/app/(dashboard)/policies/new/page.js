@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { HEALTH_INSURANCE_COMPANIES, HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
+import { POLICY_DISCOUNT_TYPES, POLICY_RENEWAL_YEARS, POLICY_STATUSES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
-const STATUS_OPTIONS = ['Pending', 'Paid', 'Overdue', 'Grace Period', 'Lapsed'];
 const OTHER_COMPANY = 'Other';
 
 export default function NewPolicyPage() {
@@ -21,7 +21,11 @@ export default function NewPolicyPage() {
     insurance_company: '',
     other_company: '',
     policy_number: '',
+    plan_name: '',
     premium_amount: '',
+    sum_insured: '',
+    renewal_years: '1',
+    discount_type: '',
     due_date: '',
     payment_due_date: '',
     issuance_date: '',
@@ -48,7 +52,10 @@ export default function NewPolicyPage() {
       const payload = {
         ...form,
         insurance_company: form.insurance_company === OTHER_COMPANY ? form.other_company : form.insurance_company,
-        premium_amount: parseFloat(form.premium_amount)
+        premium_amount: parseFloat(form.premium_amount),
+        sum_insured: form.sum_insured === '' ? null : parseFloat(form.sum_insured),
+        renewal_years: Number(form.renewal_years || 1),
+        discount_type: form.discount_type || null
       };
       delete payload.other_company;
 
@@ -129,6 +136,17 @@ export default function NewPolicyPage() {
           </div>
 
           <div className={styles.field}>
+            <label>Plan Name</label>
+            <input
+              type="text"
+              name="plan_name"
+              value={form.plan_name}
+              onChange={handleChange}
+              placeholder="e.g., ReAssure 2.0 Titanium"
+            />
+          </div>
+
+          <div className={styles.field}>
             <label>Premium Amount (INR) *</label>
             <input
               type="number"
@@ -140,6 +158,34 @@ export default function NewPolicyPage() {
               step="0.01"
               placeholder="0.00"
             />
+          </div>
+
+          <div className={styles.field}>
+            <label>Sum Insured (INR)</label>
+            <input
+              type="number"
+              name="sum_insured"
+              value={form.sum_insured}
+              onChange={handleChange}
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label>Renewal Paid For</label>
+            <select name="renewal_years" value={form.renewal_years} onChange={handleChange}>
+              {POLICY_RENEWAL_YEARS.map(year => <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>)}
+            </select>
+          </div>
+
+          <div className={styles.field}>
+            <label>Discount</label>
+            <select name="discount_type" value={form.discount_type} onChange={handleChange}>
+              <option value="">No discount</option>
+              {POLICY_DISCOUNT_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+            </select>
           </div>
 
           <div className={styles.field}>
@@ -199,7 +245,7 @@ export default function NewPolicyPage() {
           <div className={styles.field}>
             <label>Status</label>
             <select name="status" value={form.status} onChange={handleChange}>
-              {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+              {POLICY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         </div>

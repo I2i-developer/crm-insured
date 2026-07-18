@@ -122,20 +122,29 @@
 .badgeOverdue { background: #fee2e2; color: #b91c1c; }
 .badgeGracePeriod { background: #e0f2fe; color: #0369a1; }
 .badgeLapsed { background: #f2f4f7; color: #667085; }
+.badgeRenewDone { background: #dbeafe; color: #1d4ed8; }
 
 .submitBtn,
 .saveBtn,
 .cancelBtn,
 .actionBtn {
-  min-height: 34px;
+  width: 34px;
+  height: 34px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  padding: 0 12px;
+  padding: 0;
   cursor: pointer;
   font-size: 12px;
   font-weight: 800;
+}
+
+.saveBtn svg,
+.cancelBtn svg,
+.actionBtn svg {
+  width: 15px;
+  height: 15px;
 }
 
 .submitBtn,

@@ -51,7 +51,7 @@ export async function GET(request) {
       queryBuilder = queryBuilder.lte('due_date', due_date_to);
     }
 
-    const sortColumn = ['due_date', 'client_name', 'premium_amount', 'created_at'].includes(sort_by)
+    const sortColumn = ['due_date', 'payment_due_date', 'client_name', 'premium_amount', 'created_at'].includes(sort_by)
       ? sort_by
       : 'due_date';
     const ascending = sort_order === 'asc';

@@ -238,7 +238,7 @@ export default function LeadsPage() {
                         <h2>{lead.client_name}</h2>
                         <p>{lead.phone || 'No phone'} {lead.email ? `| ${lead.email}` : ''}</p>
                       </div>
-                      <button type="button" className={styles.deleteBtn} onClick={() => handleDelete(lead.id)}>Delete</button>
+                      <button type="button" className={styles.deleteBtn} onClick={() => handleDelete(lead.id)} title="Delete lead" aria-label="Delete lead"><DeleteIcon /></button>
                     </div>
 
                     <div className={styles.leadMeta}>
@@ -293,6 +293,17 @@ export default function LeadsPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 6h18"/>
+      <path d="M8 6V4h8v2"/>
+      <path d="M19 6l-1 15H6L5 6"/>
+      <path d="M10 11v6M14 11v6"/>
+    </svg>
   );
 }
 

@@ -21,8 +21,22 @@ function formatCurrency(amount) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount || 0);
 }
 
+function startOfToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+function getPolicyPaymentDate(policy) {
+  return policy.payment_due_date || policy.due_date;
+}
+
 function statusClass(status) {
-  return styles[`badge${String(status || '').replace(' ', '')}`] || '';
+  return styles[`badge${String(status || '').replace(/\s+/g, '')}`] || '';
+}
+
+function isPolicyClosed(policy) {
+  return policy.status === 'Paid' || policy.status === 'Renew Done';
 }
 
 function getClientInitial(name) {
@@ -52,7 +66,7 @@ export default function PolicyReportPage({
     const params = new URLSearchParams({
       page: '1',
       limit: '1000',
-      sort_by: 'due_date',
+      sort_by: mode === 'paymentDue' || mode === 'upcomingPayment' ? 'payment_due_date' : 'due_date',
       sort_order: 'asc'
     });
 
@@ -60,11 +74,11 @@ export default function PolicyReportPage({
     if (company) params.set('company', company);
     if (status) params.set('status', status);
 
-    if (mode === 'expired' || mode === 'paymentDue') {
+    if (mode === 'expired') {
       params.set('due_date_to', toDateInput(new Date(today.getTime() - DAY_MS)));
     }
 
-    if (mode === 'upcomingExpiry' || mode === 'upcomingPayment') {
+    if (mode === 'upcomingExpiry') {
       params.set('due_date_from', toDateInput(today));
       params.set('due_date_to', toDateInput(new Date(today.getTime() + Number(range) * DAY_MS)));
     }
@@ -96,9 +110,28 @@ export default function PolicyReportPage({
   }, [query, toast]);
 
   const filteredPolicies = useMemo(() => {
+    const today = startOfToday();
+    const rangeEnd = new Date(today.getTime() + Number(range) * DAY_MS);
+
+    if (mode === 'paymentDue') {
+      return policies.filter(policy => {
+        if (isPolicyClosed(policy)) return false;
+        const paymentDate = new Date(getPolicyPaymentDate(policy));
+        return !Number.isNaN(paymentDate.getTime()) && paymentDate < today;
+      });
+    }
+
+    if (mode === 'upcomingPayment') {
+      return policies.filter(policy => {
+        if (isPolicyClosed(policy)) return false;
+        const paymentDate = new Date(getPolicyPaymentDate(policy));
+        return !Number.isNaN(paymentDate.getTime()) && paymentDate >= today && paymentDate <= rangeEnd;
+      });
+    }
+
     if (!['expired', 'upcomingExpiry'].includes(mode)) return policies;
-    return policies.filter(policy => policy.status !== 'Paid');
-  }, [mode, policies]);
+    return policies.filter(policy => !isPolicyClosed(policy));
+  }, [mode, policies, range]);
 
   const companies = useMemo(() => {
     return [...new Set(policies.map(policy => policy.insurance_company).filter(Boolean))].sort();
@@ -107,7 +140,7 @@ export default function PolicyReportPage({
   const totalPremium = filteredPolicies.reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
   const pendingCount = filteredPolicies.filter(policy => policy.status === 'Pending').length;
   const urgentCount = filteredPolicies.filter(policy => {
-    const due = new Date(policy.due_date);
+    const due = new Date(mode === 'paymentDue' || mode === 'upcomingPayment' ? getPolicyPaymentDate(policy) : policy.due_date);
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return due <= new Date(now.getTime() + 7 * DAY_MS);
@@ -177,7 +210,7 @@ export default function PolicyReportPage({
                 <th>Policy #</th>
                 <th>Company</th>
                 <th>Type</th>
-                <th>Due Date</th>
+                <th>{mode === 'paymentDue' || mode === 'upcomingPayment' ? 'Payment Due' : 'Due Date'}</th>
                 <th>Premium</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -195,10 +228,10 @@ export default function PolicyReportPage({
                   <td className={styles.muted}>{policy.policy_number}</td>
                   <td>{policy.insurance_company}</td>
                   <td>{policy.policy_type || HEALTH_POLICY_TYPE}</td>
-                  <td>{formatDate(policy.due_date)}</td>
+                  <td>{formatDate(mode === 'paymentDue' || mode === 'upcomingPayment' ? getPolicyPaymentDate(policy) : policy.due_date)}</td>
                   <td className={styles.amount}>{formatCurrency(policy.premium_amount)}</td>
                   <td><span className={`${styles.badge} ${statusClass(policy.status)}`}>{policy.status}</span></td>
-                  <td><Link className={styles.secondaryBtn} href={`/policies/edit/${policy.id}`}>Open</Link></td>
+                  <td><Link className={`${styles.secondaryBtn} ${styles.iconBtn}`} href={`/policies/${policy.id}`} title="Open policy details" aria-label="Open policy details"><OpenIcon /></Link></td>
                 </tr>
               ))}
             </tbody>
@@ -206,5 +239,14 @@ export default function PolicyReportPage({
         )}
       </div>
     </div>
+  );
+}
+
+function OpenIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
   );
 }

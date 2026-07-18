@@ -41,6 +41,7 @@
 .previewPanel {
   display: grid;
   justify-items: center;
+  gap: 16px;
   padding: 26px 18px;
   text-align: center;
 }
@@ -50,7 +51,6 @@
   height: 112px;
   display: grid;
   place-items: center;
-  margin-bottom: 16px;
   border: 6px solid #fff;
   border-radius: 50%;
   background: #ecebff;
@@ -67,27 +67,38 @@
 }
 
 .previewPanel h2 {
-  margin: 0 0 6px;
+  margin: 0;
   color: var(--text);
   font-size: 17px;
   font-weight: 900;
 }
 
-.previewPanel p,
-.previewPanel span {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.5;
+.avatarActions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 9px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
 }
 
-.previewPanel strong {
-  margin-top: 14px;
+.avatarActions .primaryBtn {
+  width: 100%;
+}
+
+.fileInput {
+  display: none;
+}
+
+.previewPanel > strong {
   padding: 6px 13px;
   border-radius: 999px;
   background: #eef4ff;
   color: var(--primary);
   font-size: 12px;
+  font-weight: 900;
 }
 
 .formPanel {
@@ -179,6 +190,11 @@
   cursor: not-allowed;
 }
 
+.secondaryBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .loading {
   min-height: 280px;
   display: grid;
@@ -197,6 +213,10 @@
 }
 
 @media (max-width: 640px) {
+  .avatarActions {
+    grid-template-columns: 1fr;
+  }
+
   .actions {
     flex-direction: column-reverse;
   }

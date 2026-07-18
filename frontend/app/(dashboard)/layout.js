@@ -99,7 +99,7 @@ function buildReminders(policies = [], leads = []) {
     const status = policy.status || 'Pending';
     const dueDays = getDaysFromToday(policy.due_date, today);
     const paymentDays = getDaysFromToday(policy.payment_due_date || policy.due_date, today);
-    const isPaid = status === 'Paid';
+    const isClosed = status === 'Paid' || status === 'Renew Done';
     const isLapsed = status === 'Lapsed';
 
     if (isLapsed) {
@@ -107,20 +107,20 @@ function buildReminders(policies = [], leads = []) {
       return;
     }
 
-    if (!isPaid && (status === 'Overdue' || (dueDays !== null && dueDays < 0))) {
+    if (!isClosed && (status === 'Overdue' || (dueDays !== null && dueDays < 0))) {
       reminders.push(buildPolicyReminder(policy, 'overdue', dueDays, '/expired-policies'));
       return;
     }
 
-    if (!isPaid && status === 'Grace Period') {
+    if (!isClosed && status === 'Grace Period') {
       reminders.push(buildPolicyReminder(policy, 'grace', dueDays, '/upcoming-renewals'));
     }
 
-    if (!isPaid && paymentDays !== null && paymentDays <= 0) {
+    if (!isClosed && paymentDays !== null && paymentDays <= 0) {
       reminders.push(buildPolicyReminder(policy, 'paymentDue', paymentDays, '/payment-due-policy'));
     }
 
-    if (!isPaid && dueDays !== null && dueDays >= 0 && dueDays <= UPCOMING_RENEWAL_DAYS) {
+    if (!isClosed && dueDays !== null && dueDays >= 0 && dueDays <= UPCOMING_RENEWAL_DAYS) {
       reminders.push(buildPolicyReminder(policy, 'renewal', dueDays, '/upcoming-renewals'));
     }
   });
@@ -403,7 +403,7 @@ export default function DashboardLayout({ children }) {
             <span className={styles.navIcon}><DashboardIcon /></span>
             Dashboard
           </Link>
-          <Link href="/policies" className={`${styles.navItem} ${pathname === '/policies' || pathname.startsWith('/policies/edit') ? styles.active : ''}`}>
+          <Link href="/policies" className={`${styles.navItem} ${pathname === '/policies' || pathname.startsWith('/policies/') ? styles.active : ''}`}>
             <span className={styles.navIcon}><PolicyIcon /></span>
             Policies
           </Link>
@@ -456,10 +456,6 @@ export default function DashboardLayout({ children }) {
           <Link href="/payment-due-policy" className={`${styles.navItem} ${pathname === '/payment-due-policy' ? styles.active : ''}`}>
             <span className={styles.navIcon}><PaymentIcon /></span>
             Payment Due
-          </Link>
-          <Link href="/upcoming-payment-policy" className={`${styles.navItem} ${pathname === '/upcoming-payment-policy' ? styles.active : ''}`}>
-            <span className={styles.navIcon}><CalendarIcon /></span>
-            Upcoming Payment
           </Link>
           <span className={styles.navGroup}>Customers</span>
           <Link href="/clients" className={`${styles.navItem} ${pathname === '/clients' ? styles.active : ''}`}>

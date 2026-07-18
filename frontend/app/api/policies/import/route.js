@@ -1,8 +1,54 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getAuthFromRequest } from '@/lib/server-auth';
-import { validatePolicyInput } from '@/lib/validation';
+import { POLICY_STATUSES, parseSpreadsheetDate, validatePolicyInput } from '@/lib/validation';
 import ExcelJS from 'exceljs';
+
+const STATUS_VALUES = new Set(POLICY_STATUSES);
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function normalizeHeader(header) {
+  return String(header || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+}
+
+function normalizeImportRow(row) {
+  return Object.entries(row).reduce((normalized, [key, value]) => {
+    const header = normalizeHeader(key);
+    if (!header) return normalized;
+    normalized[header] = value;
+    return normalized;
+  }, {});
+}
+
+function normalizeStatus(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) return '';
+  return Array.from(STATUS_VALUES).find(status => status.toLowerCase() === trimmed.toLowerCase()) || trimmed;
+}
+
+function deriveStatusFromDates(row) {
+  const dueDate = parseSpreadsheetDate(row.due_date);
+  const paymentDate = parseSpreadsheetDate(row.payment_due_date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (dueDate) {
+    const due = new Date(`${dueDate}T00:00:00.000Z`);
+    const daysPastDue = Math.floor((today - due) / DAY_MS);
+    if (daysPastDue > 30) return 'Lapsed';
+    if (daysPastDue > 0) return 'Grace Period';
+  }
+
+  if (paymentDate) {
+    const payment = new Date(`${paymentDate}T00:00:00.000Z`);
+    if (payment < today) return 'Overdue';
+  }
+
+  return 'Pending';
+}
 
 function parseCsvLine(line) {
   const values = [];
@@ -50,7 +96,7 @@ async function parseImportFile(file, buffer) {
     const lines = text.split(/\r?\n/).filter(line => line.trim());
     if (lines.length < 2) return [];
 
-    const headers = parseCsvLine(lines[0]);
+    const headers = parseCsvLine(lines[0]).map(normalizeHeader);
     return lines.slice(1).map(line => {
       const values = parseCsvLine(line);
       return headers.reduce((row, header, index) => {
@@ -67,7 +113,7 @@ async function parseImportFile(file, buffer) {
 
   const headers = [];
   worksheet.getRow(1).eachCell((cell, colNumber) => {
-    headers[colNumber] = String(cell.value || '').trim();
+    headers[colNumber] = normalizeHeader(cell.value);
   });
 
   const rows = [];
@@ -121,8 +167,9 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Import is limited to 1000 rows per file' }, { status: 400 });
     }
 
+    const normalizedData = data.map(normalizeImportRow);
     const requiredFields = ['client_name', 'insurance_company', 'policy_number', 'premium_amount', 'due_date', 'issuance_date'];
-    const firstRow = data[0];
+    const firstRow = normalizedData[0];
     const missingFields = requiredFields.filter(field => !(field in firstRow));
 
     if (missingFields.length > 0) {
@@ -132,15 +179,25 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    const rows = data.map((row, index) => {
-      const { policy, errors } = validatePolicyInput(row);
+    const rows = normalizedData.map((row, index) => {
+      const normalizedStatus = normalizeStatus(row.status);
+      const rowForValidation = {
+        ...row,
+        status: normalizedStatus || deriveStatusFromDates(row)
+      };
+      const { policy, errors } = validatePolicyInput(rowForValidation);
       return { policy: { ...policy, user_id: auth.userId }, errors, rowNumber: index + 2 };
     });
 
     const invalidRows = rows.filter(row => row.errors.length);
     if (invalidRows.length) {
+      const rowDetails = invalidRows
+        .slice(0, 5)
+        .map(row => `Row ${row.rowNumber}: ${row.errors.join(', ')}`)
+        .join('; ');
+
       return NextResponse.json({
-        error: 'Import contains invalid rows',
+        error: `Import contains invalid rows. ${rowDetails}`,
         rows: invalidRows.slice(0, 10).map(row => ({
           row: row.rowNumber,
           errors: row.errors
@@ -167,7 +224,7 @@ export async function POST(request) {
     return NextResponse.json({
       message: `Successfully imported ${insertedData.length} policies`,
       imported: insertedData.length,
-      failed: data.length - insertedData.length
+      failed: normalizedData.length - insertedData.length
     }, { status: 201 });
   } catch (error) {
     console.error('Import error:', error);

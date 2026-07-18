@@ -96,7 +96,9 @@ export default function ImportPoliciesPage() {
         <ul>
           <li>Supported formats: CSV, XLSX</li>
           <li>Required columns: client_name, insurance_company, policy_number, premium_amount, due_date, issuance_date</li>
-          <li>Optional columns: policy_type, payment_due_date, phone, email, status</li>
+          <li>Optional columns: policy_type, plan_name, sum_insured, renewal_years, discount_type, payment_due_date, phone, email</li>
+          <li>Status is calculated automatically from the due and payment dates.</li>
+          <li>renewal_years accepts 1, 2, or 3. discount_type accepts NRI discount or Family discount.</li>
           <li>For this CRM, policy_type should be Health Insurance. Blank values are treated as Health Insurance.</li>
           <li>Date format: YYYY-MM-DD or MM/DD/YYYY</li>
         </ul>
@@ -157,8 +159,8 @@ export default function ImportPoliciesPage() {
         <h3>Download Template</h3>
         <p>Use this template to ensure your data is formatted correctly:</p>
         <button onClick={() => {
-          const headers = ['client_name', 'policy_type', 'insurance_company', 'policy_number', 'premium_amount', 'due_date', 'payment_due_date', 'issuance_date', 'phone', 'email', 'status'];
-          const sampleRow = ['John Doe', 'Health Insurance', 'HDFC', 'POL-001', '1500.00', '2026-05-15', '2026-05-01', '2025-05-15', '+919876543210', 'john@example.com', 'Pending'];
+          const headers = ['client_name', 'policy_type', 'insurance_company', 'policy_number', 'plan_name', 'premium_amount', 'sum_insured', 'renewal_years', 'discount_type', 'due_date', 'payment_due_date', 'issuance_date', 'phone', 'email'];
+          const sampleRow = ['John Doe', 'Health Insurance', 'HDFC', 'POL-001', 'Optima Secure', '1500.00', '500000', '1', 'Family discount', '2026-05-15', '2026-05-01', '2025-05-15', '+919876543210', 'john@example.com'];
           const csv = [headers.join(','), sampleRow.join(',')].join('\n');
           const blob = new Blob([csv], { type: 'text/csv' });
           const url = URL.createObjectURL(blob);

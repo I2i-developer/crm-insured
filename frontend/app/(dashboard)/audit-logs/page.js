@@ -14,13 +14,25 @@ export default function AuditLogsPage() {
   const [filters, setFilters] = useState({ action: '', entity_type: '' });
 
   useEffect(() => {
-    const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
-    if (storedUser?.role !== 'super_admin') {
-      toast.error('Only SuperAdmin can view audit logs.');
-      router.push('/dashboard');
-      return;
-    }
-    fetchLogs();
+    let active = true;
+    api.get('/auth/me')
+      .then(data => {
+        if (!active) return;
+        if (data.user?.role !== 'super_admin') {
+          toast.error('Only SuperAdmin can view audit logs.');
+          router.push('/dashboard');
+          return;
+        }
+        fetchLogs();
+      })
+      .catch(error => {
+        toast.error(error.message || 'Failed to verify SuperAdmin access.');
+        router.push('/dashboard');
+      });
+
+    return () => {
+      active = false;
+    };
   }, [filters, router, toast]);
 
   const fetchLogs = async () => {

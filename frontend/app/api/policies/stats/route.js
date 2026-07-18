@@ -38,6 +38,9 @@ export async function GET(request) {
     const { count: lapsedCount } = await baseCount()
       .eq('status', 'Lapsed');
 
+    const { count: renewDoneCount } = await baseCount()
+      .eq('status', 'Renew Done');
+
     return NextResponse.json({
       stats: {
         total: totalCount || 0,
@@ -45,7 +48,8 @@ export async function GET(request) {
         paid: paidCount || 0,
         overdue: overdueCount || 0,
         gracePeriod: gracePeriodCount || 0,
-        lapsed: lapsedCount || 0
+        lapsed: lapsedCount || 0,
+        renewDone: renewDoneCount || 0
       }
     });
   } catch (error) {

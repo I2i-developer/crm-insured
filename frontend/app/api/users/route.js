@@ -6,6 +6,33 @@ import { cleanString, isValidEmail } from '@/lib/validation';
 
 const CREATABLE_ROLES = [USER_ROLES.ADMIN, USER_ROLES.TEAM_MEMBER];
 
+async function safeUpdate(supabaseAdmin, table, values, column, userId) {
+  const { error } = await supabaseAdmin
+    .from(table)
+    .update(values)
+    .eq(column, userId);
+
+  if (error && !['42P01', '42703', 'PGRST205', 'PGRST204'].includes(error.code)) {
+    throw error;
+  }
+}
+
+async function transferUserRecords(supabaseAdmin, fromUserId, toUserId) {
+  await safeUpdate(supabaseAdmin, 'clients', { user_id: toUserId }, 'user_id', fromUserId);
+  await safeUpdate(supabaseAdmin, 'clients', { assigned_to: null }, 'assigned_to', fromUserId);
+
+  await safeUpdate(supabaseAdmin, 'policies', { user_id: toUserId }, 'user_id', fromUserId);
+  await safeUpdate(supabaseAdmin, 'policies', { assigned_to: null }, 'assigned_to', fromUserId);
+  await safeUpdate(supabaseAdmin, 'policies', { created_by: toUserId }, 'created_by', fromUserId);
+
+  await safeUpdate(supabaseAdmin, 'interaction_logs', { user_id: toUserId }, 'user_id', fromUserId);
+
+  await safeUpdate(supabaseAdmin, 'leads', { user_id: toUserId }, 'user_id', fromUserId);
+  await safeUpdate(supabaseAdmin, 'leads', { assigned_to: null }, 'assigned_to', fromUserId);
+
+  await safeUpdate(supabaseAdmin, 'lead_remarks', { user_id: toUserId }, 'user_id', fromUserId);
+}
+
 function publicUser(user) {
   return {
     id: user.id,
@@ -102,5 +129,69 @@ export async function POST(request) {
   } catch (error) {
     console.error('Create user error:', error);
     return NextResponse.json({ error: 'Failed to create user' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!isSuperAdminRole(auth.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const { searchParams } = new URL(request.url);
+    const userId = cleanString(searchParams.get('id'), 80);
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User id is required' }, { status: 400 });
+    }
+
+    if (userId === auth.userId) {
+      return NextResponse.json({ error: 'You cannot delete your own SuperAdmin account' }, { status: 400 });
+    }
+
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id, email, name, role')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (isSuperAdminRole(user.role)) {
+      const { count, error: countError } = await supabaseAdmin
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('role', USER_ROLES.SUPER_ADMIN);
+
+      if (countError) return NextResponse.json({ error: countError.message }, { status: 400 });
+      if ((count || 0) <= 1) {
+        return NextResponse.json({ error: 'At least one SuperAdmin must remain in the CRM' }, { status: 400 });
+      }
+    }
+
+    await transferUserRecords(supabaseAdmin, user.id, auth.userId);
+
+    await writeAuditLog(request, auth, {
+      action: 'user.delete',
+      entityType: 'user',
+      entityId: user.id,
+      summary: `Deleted ${user.role} user ${user.email}`,
+      metadata: { deleted_user_email: user.email, deleted_user_role: user.role, deleted_user_name: user.name }
+    });
+
+    const { error } = await supabaseAdmin
+      .from('users')
+      .delete()
+      .eq('id', userId);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+    return NextResponse.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
   }
 }

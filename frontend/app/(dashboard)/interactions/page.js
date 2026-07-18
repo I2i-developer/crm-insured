@@ -171,7 +171,7 @@ export default function InteractionsPage() {
               </div>
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Status</span>
-                <span className={`${styles.badge} ${styles[`badge${currentPolicy.status.replace(' ', '')}`]}`}>
+                <span className={`${styles.badge} ${styles[`badge${currentPolicy.status.replace(/\s+/g, '')}`]}`}>
                   {currentPolicy.status}
                 </span>
               </div>
@@ -243,14 +243,18 @@ export default function InteractionsPage() {
                             onClick={() => handleSaveEdit(log.id)}
                             disabled={savingEdit || !editText.trim()}
                             className={styles.saveBtn}
+                            title="Save remark"
+                            aria-label="Save remark"
                           >
-                            {savingEdit ? 'Saving...' : 'Save'}
+                            {savingEdit ? '...' : <SaveIcon />}
                           </button>
                           <button
                             onClick={handleCancelEdit}
                             className={styles.cancelBtn}
+                            title="Cancel editing"
+                            aria-label="Cancel editing"
                           >
-                            Cancel
+                            <CancelIcon />
                           </button>
                         </div>
                       </div>
@@ -260,8 +264,8 @@ export default function InteractionsPage() {
                         <div className={styles.remarkMeta}>
                           <span className={styles.timestamp}>{formatDate(log.created_at)}</span>
                           <div className={styles.remarkActions}>
-                            <button onClick={() => handleEdit(log)} className={styles.actionBtn}>Edit</button>
-                            <button onClick={() => handleDelete(log.id)} className={`${styles.actionBtn} ${styles.deleteBtn}`}>Delete</button>
+                            <button onClick={() => handleEdit(log)} className={styles.actionBtn} title="Edit remark" aria-label="Edit remark"><EditIcon /></button>
+                            <button onClick={() => handleDelete(log.id)} className={`${styles.actionBtn} ${styles.deleteBtn}`} title="Delete remark" aria-label="Delete remark"><DeleteIcon /></button>
                           </div>
                         </div>
                       </>
@@ -274,6 +278,45 @@ export default function InteractionsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 20h9"/>
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 6h18"/>
+      <path d="M8 6V4h8v2"/>
+      <path d="M19 6l-1 15H6L5 6"/>
+      <path d="M10 11v6M14 11v6"/>
+    </svg>
+  );
+}
+
+function SaveIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+      <path d="M17 21v-8H7v8"/>
+      <path d="M7 3v5h8"/>
+    </svg>
+  );
+}
+
+function CancelIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M18 6 6 18"/>
+      <path d="m6 6 12 12"/>
+    </svg>
   );
 }
 

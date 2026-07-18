@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { HEALTH_INSURANCE_COMPANIES, HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
+import { POLICY_STATUSES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
@@ -130,7 +131,8 @@ export default function PoliciesPage() {
       'Pending': styles.badgePending,
       'Overdue': styles.badgeOverdue,
       'Grace Period': styles.badgeGrace,
-      'Lapsed': styles.badgeLapsed
+      'Lapsed': styles.badgeLapsed,
+      'Renew Done': styles.badgeRenewDone
     };
     return map[status] || '';
   };
@@ -195,11 +197,7 @@ export default function PoliciesPage() {
           </select>
           <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)} className={styles.select}>
             <option value="">All Statuses</option>
-            <option value="Pending">Pending</option>
-            <option value="Paid">Paid</option>
-            <option value="Overdue">Overdue</option>
-            <option value="Grace Period">Grace Period</option>
-            <option value="Lapsed">Lapsed</option>
+            {POLICY_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
           </select>
           <input
             type="date"
@@ -271,20 +269,17 @@ export default function PoliciesPage() {
                           className={`${styles.statusSelect} ${getStatusClass(policy.status)}`}
                           title={hasValidId ? 'Update policy status' : 'Policy id is missing'}
                         >
-                          <option value="Pending">Pending</option>
-                          <option value="Paid">Paid</option>
-                          <option value="Overdue">Overdue</option>
-                          <option value="Grace Period">Grace Period</option>
-                          <option value="Lapsed">Lapsed</option>
+                          {POLICY_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                         </select>
                       </td>
                       <td>
                         <div className={styles.actionBtns}>
                           {hasValidId ? (
                             <>
-                              <Link href={`/policies/edit/${policy.id}`} className={styles.editBtn}>Edit</Link>
-                              <Link href={`/interactions?policy=${policy.id}`} className={styles.logBtn}>Logs</Link>
-                              <button onClick={() => handleDelete(policy.id)} className={styles.deleteBtn}>Delete</button>
+                              <Link href={`/policies/${policy.id}`} className={styles.editBtn} title="View policy" aria-label="View policy"><ViewIcon /></Link>
+                              <Link href={`/policies/edit/${policy.id}`} className={styles.editBtn} title="Edit policy" aria-label="Edit policy"><EditIcon /></Link>
+                              <Link href={`/interactions?policy=${policy.id}`} className={styles.logBtn} title="Policy remarks and logs" aria-label="Policy remarks and logs"><LogsIcon /></Link>
+                              <button type="button" onClick={() => handleDelete(policy.id)} className={styles.deleteBtn} title="Delete policy" aria-label="Delete policy"><DeleteIcon /></button>
                             </>
                           ) : (
                             <span className={styles.invalidRecord}>Missing ID</span>
@@ -350,5 +345,35 @@ const EmptyIcon = () => (
     <polyline points="14,2 14,8 20,8"/>
     <line x1="12" y1="12" x2="12" y2="18"/>
     <line x1="9" y1="15" x2="15" y2="15"/>
+  </svg>
+);
+
+const ViewIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+    <circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+
+const EditIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M12 20h9"/>
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+  </svg>
+);
+
+const LogsIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/>
+    <path d="M8 9h8M8 13h5"/>
+  </svg>
+);
+
+const DeleteIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M3 6h18"/>
+    <path d="M8 6V4h8v2"/>
+    <path d="M19 6l-1 15H6L5 6"/>
+    <path d="M10 11v6M14 11v6"/>
   </svg>
 );

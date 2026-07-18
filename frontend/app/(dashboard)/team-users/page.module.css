@@ -211,6 +211,37 @@
   font-weight: 900;
 }
 
+.deleteBtn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fff7f7;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.deleteBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
+.deleteBtn:hover:not(:disabled) {
+  border-color: #fca5a5;
+  background: #fee2e2;
+}
+
+.deleteBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
 .state {
   min-height: 260px;
   display: grid;

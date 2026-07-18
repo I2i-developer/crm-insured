@@ -1,5 +1,20 @@
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
+function getApiUrl(endpoint) {
+  const isLocalBrowser = typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+
+  if (isLocalBrowser) return `/api${endpoint}`;
+
+  const configured = API_URL.replace(/\/$/, '');
+  const base = configured && !/^https?:\/\//i.test(configured) && !configured.startsWith('/')
+    ? `https://${configured}`
+    : configured;
+
+  if (!base) return `/api${endpoint}`;
+  return base.endsWith('/api') ? `${base}${endpoint}` : `${base}/api${endpoint}`;
+}
+
 export const fetchAPI = async (endpoint, options = {}) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
@@ -13,7 +28,7 @@ export const fetchAPI = async (endpoint, options = {}) => {
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const url = API_URL ? `${API_URL}${endpoint}` : `/api${endpoint}`;
+  const url = getApiUrl(endpoint);
 
   const res = await fetch(url, {
     ...options,

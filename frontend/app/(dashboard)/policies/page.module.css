@@ -284,6 +284,7 @@
 .badgeOverdue { background: #fee2e2; color: #b91c1c; }
 .badgeGrace { background: #e0f2fe; color: #0369a1; }
 .badgeLapsed { background: #f2f4f7; color: #667085; }
+.badgeRenewDone { background: #dbeafe; color: #1d4ed8; }
 
 .actionBtns {
   display: flex;
@@ -294,15 +295,23 @@
 .editBtn,
 .logBtn,
 .deleteBtn {
-  min-height: 28px;
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 5px;
-  padding: 0 9px;
+  padding: 0;
   font-size: 11px;
   font-weight: 800;
   cursor: pointer;
+}
+
+.editBtn svg,
+.logBtn svg,
+.deleteBtn svg {
+  width: 15px;
+  height: 15px;
 }
 
 .editBtn,

@@ -53,6 +53,16 @@
   color: #344054;
 }
 
+.iconBtn {
+  width: 32px;
+  padding: 0;
+}
+
+.iconBtn svg {
+  width: 15px;
+  height: 15px;
+}
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -221,6 +231,7 @@
 .badgeOverdue { background: #fee2e2; color: #b91c1c; }
 .badgeGracePeriod { background: #e0f2fe; color: #0369a1; }
 .badgeLapsed { background: #f2f4f7; color: #667085; }
+.badgeRenewDone { background: #dbeafe; color: #1d4ed8; }
 
 .amount {
   color: var(--text);

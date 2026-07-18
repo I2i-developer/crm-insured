@@ -65,7 +65,7 @@ export default function ManageClientsPage() {
       };
 
       existing.policies += 1;
-      existing.activePolicies += policy.status === 'Paid' || policy.status === 'Pending' ? 1 : 0;
+      existing.activePolicies += ['Paid', 'Renew Done', 'Pending'].includes(policy.status) ? 1 : 0;
       existing.premium += Number(policy.premium_amount || 0);
       existing.latestStatus = policy.status;
 
@@ -156,7 +156,7 @@ export default function ManageClientsPage() {
                   <td>{client.activePolicies}</td>
                   <td>{formatDate(client.nextDueDate)}</td>
                   <td className={styles.amount}>{formatCurrency(client.premium)}</td>
-                  <td><span className={`${styles.badge} ${styles[`badge${client.latestStatus?.replace(' ', '')}`]}`}>{client.latestStatus}</span></td>
+                  <td><span className={`${styles.badge} ${styles[`badge${client.latestStatus?.replace(/\s+/g, '')}`]}`}>{client.latestStatus}</span></td>
                 </tr>
               ))}
             </tbody>

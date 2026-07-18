@@ -27,9 +27,12 @@ export default function TeamUsersPage() {
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
 
   useEffect(() => {
     const storedUser = JSON.parse(localStorage.getItem('user') || 'null');
+    setCurrentUser(storedUser);
     if (storedUser?.role !== 'super_admin') {
       toast.error('Only SuperAdmin can manage CRM users.');
       router.push('/dashboard');
@@ -74,6 +77,31 @@ export default function TeamUsersPage() {
   const handleChange = (event) => {
     const { name, value } = event.target;
     setForm(current => ({ ...current, [name]: value }));
+  };
+
+  const handleDeleteUser = async (user) => {
+    if (user.id === currentUser?.id) {
+      toast.error('You cannot delete your own SuperAdmin account.');
+      return;
+    }
+
+    const confirmed = await toast.confirm({
+      title: 'Delete CRM user?',
+      message: `Delete ${user.name} (${user.email}) from the CRM? Their assigned records will be transferred before deletion.`,
+      confirmLabel: 'Delete'
+    });
+    if (!confirmed) return;
+
+    setDeletingId(user.id);
+    try {
+      await api.delete(`/users?id=${encodeURIComponent(user.id)}`);
+      toast.success('CRM user deleted successfully.');
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.message || 'Failed to delete user.');
+    } finally {
+      setDeletingId('');
+    }
   };
 
   return (
@@ -142,6 +170,7 @@ export default function TeamUsersPage() {
                   <th>Role</th>
                   <th>Designation</th>
                   <th>Created</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -159,6 +188,17 @@ export default function TeamUsersPage() {
                     <td><span className={styles.rolePill}>{roleLabels[user.role] || user.role}</span></td>
                     <td>{user.designation || '-'}</td>
                     <td>{new Date(user.created_at).toLocaleDateString('en-IN')}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className={styles.deleteBtn}
+                        onClick={() => handleDeleteUser(user)}
+                        disabled={deletingId === user.id || user.id === currentUser?.id}
+                        title={user.id === currentUser?.id ? 'You cannot delete your own account' : `Delete ${user.name}`}
+                      >
+                        {deletingId === user.id ? '...' : <DeleteIcon />}
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -167,6 +207,17 @@ export default function TeamUsersPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 6h18"/>
+      <path d="M8 6V4h8v2"/>
+      <path d="M19 6l-1 15H6L5 6"/>
+      <path d="M10 11v6M14 11v6"/>
+    </svg>
   );
 }
 

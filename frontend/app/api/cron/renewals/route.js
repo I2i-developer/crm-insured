@@ -18,7 +18,7 @@ const shouldSendReminder = (policy) => {
 };
 
 const shouldSendOverdueAlert = (policy) => {
-  const isOverdue = new Date(policy.due_date) < new Date() && policy.status !== 'Paid';
+  const isOverdue = new Date(policy.due_date) < new Date() && !['Paid', 'Renew Done'].includes(policy.status);
   const lastAlertSent = policy.last_alert_sent_at
     ? new Date(policy.last_alert_sent_at)
     : new Date(policy.due_date);
@@ -115,7 +115,7 @@ export async function GET(request) {
     const { data: policies, error } = await supabaseAdmin
       .from('policies')
       .select('*')
-      .neq('status', 'Paid');
+      .not('status', 'in', '("Paid","Renew Done")');
 
     if (error) {
       console.error('Failed to fetch policies for cron:', error);

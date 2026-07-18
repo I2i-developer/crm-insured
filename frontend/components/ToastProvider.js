@@ -7,6 +7,7 @@ const ToastContext = createContext(null);
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const nextId = useRef(1);
 
   const dismiss = useCallback((id) => {
@@ -43,17 +44,13 @@ export function ToastProvider({ children }) {
     warning: (message, title = 'Attention') => show({ type: 'warning', title, message }),
     confirm: ({ title = 'Are you sure?', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel' }) => (
       new Promise(resolve => {
-        show({
-          type: 'warning',
+        setConfirmDialog({
           title,
           message,
-          duration: 0,
-          confirm: {
-            confirmLabel,
-            cancelLabel,
-            onConfirm: () => resolve(true),
-            onCancel: () => resolve(false)
-          }
+          confirmLabel,
+          cancelLabel,
+          onConfirm: () => resolve(true),
+          onCancel: () => resolve(false)
         });
       })
     )
@@ -65,9 +62,38 @@ export function ToastProvider({ children }) {
     else toast.confirm.onCancel();
   };
 
+  const handleDialogClose = (result) => {
+    const dialog = confirmDialog;
+    setConfirmDialog(null);
+    if (!dialog) return;
+    if (result) dialog.onConfirm();
+    else dialog.onCancel();
+  };
+
   return (
     <ToastContext.Provider value={api}>
       {children}
+      {confirmDialog && (
+        <div className={styles.confirmOverlay} role="presentation" onMouseDown={() => handleDialogClose(false)}>
+          <div className={styles.confirmDialog} role="dialog" aria-modal="true" aria-labelledby="confirm-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div className={styles.confirmIcon}>
+              <WarningIcon />
+            </div>
+            <div className={styles.confirmContent}>
+              <h2 id="confirm-title">{confirmDialog.title}</h2>
+              {confirmDialog.message && <p>{confirmDialog.message}</p>}
+            </div>
+            <div className={styles.confirmActions}>
+              <button type="button" className={styles.cancelBtn} onClick={() => handleDialogClose(false)}>
+                {confirmDialog.cancelLabel}
+              </button>
+              <button type="button" className={styles.confirmBtn} onClick={() => handleDialogClose(true)}>
+                {confirmDialog.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={styles.viewport} aria-live="polite" aria-relevant="additions">
         {toasts.map(toast => (
           <div key={toast.id} className={`${styles.toast} ${styles[toast.type] || ''}`}>
@@ -98,6 +124,16 @@ export function ToastProvider({ children }) {
         ))}
       </div>
     </ToastContext.Provider>
+  );
+}
+
+function WarningIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>
+      <path d="M12 9v4"/>
+      <path d="M12 17h.01"/>
+    </svg>
   );
 }
 

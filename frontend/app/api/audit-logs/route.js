@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { writeAuditLog } from '@/lib/audit';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getUserAccessFromRequest, isSuperAdminRole } from '@/lib/server-auth';
 
@@ -7,6 +8,14 @@ export async function GET(request) {
     const auth = await getUserAccessFromRequest(request);
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!isSuperAdminRole(auth.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    await writeAuditLog(request, auth, {
+      action: 'audit.view',
+      entityType: 'audit_log',
+      entityId: null,
+      summary: 'Viewed audit logs',
+      metadata: {}
+    });
 
     const { searchParams } = new URL(request.url);
     const limit = Math.min(parseInt(searchParams.get('limit')) || 100, 250);

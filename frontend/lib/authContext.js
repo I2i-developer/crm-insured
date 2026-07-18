@@ -5,7 +5,42 @@ import { useRouter } from 'next/navigation';
 
 const AuthContext = createContext(null);
 
-const API_BASE = '/api';
+function getApiBase() {
+  const configured = process.env.NEXT_PUBLIC_API_URL || '';
+  const isLocalBrowser = typeof window !== 'undefined'
+    && ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+
+  if (isLocalBrowser) return '/api';
+  if (!configured) return '/api';
+
+  const trimmed = configured.replace(/\/$/, '');
+  return /^https?:\/\//i.test(trimmed) || trimmed.startsWith('/')
+    ? trimmed
+    : `https://${trimmed}`;
+}
+
+function getApiUrl(endpoint) {
+  const base = getApiBase();
+  return base.endsWith('/api') ? `${base}${endpoint}` : `${base}/api${endpoint}`;
+}
+
+async function readApiResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'API request failed');
+    return data;
+  }
+
+  const text = await response.text();
+  const isHtml = text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html');
+  const message = isHtml
+    ? 'Login API returned an HTML page instead of JSON. Check that NEXT_PUBLIC_API_URL points to this app and that /api/auth/login exists.'
+    : text || 'API request failed';
+
+  throw new Error(message);
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -13,13 +48,12 @@ export const AuthProvider = ({ children }) => {
   const router = useRouter();
 
   const login = async (email, password) => {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await fetch(getApiUrl('/auth/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Login failed');
+    const data = await readApiResponse(res);
 
     const userData = {
       id: data.user.id,
@@ -39,13 +73,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (email, password, name) => {
-    const res = await fetch(`${API_BASE}/auth/register`, {
+    const res = await fetch(getApiUrl('/auth/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, name })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Registration failed');
+    const data = await readApiResponse(res);
 
     const userData = {
       id: data.user.id,
@@ -87,15 +120,10 @@ export const AuthProvider = ({ children }) => {
       }
 
       setLoading(true);
-      fetch(`${API_BASE}/auth/me`, {
+      fetch(getApiUrl('/auth/me'), {
         headers: { Authorization: `Bearer ${token}` }
       })
-      .then(res => {
-        if (res.ok) {
-          return res.json();
-        }
-        throw new Error('Auth check failed');
-      })
+      .then(readApiResponse)
       .then(data => {
         setUser(data.user);
         localStorage.setItem('user', JSON.stringify(data.user));

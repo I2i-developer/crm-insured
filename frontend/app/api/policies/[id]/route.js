@@ -14,6 +14,14 @@ function invalidPolicyIdResponse() {
   return NextResponse.json({ error: 'Invalid policy id' }, { status: 400 });
 }
 
+function addYearsToDate(value, years) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return null;
+
+  date.setUTCFullYear(date.getUTCFullYear() + years);
+  return date.toISOString().slice(0, 10);
+}
+
 async function getPolicyId(params) {
   const resolvedParams = await params;
   return resolvedParams?.id;
@@ -72,6 +80,37 @@ export async function PUT(request, { params }) {
     }
 
     const supabaseAdmin = getSupabaseAdmin();
+    let currentQuery = supabaseAdmin
+      .from('policies')
+      .select('*')
+      .eq('id', id);
+
+    if (!isPrivilegedRole(auth.role)) {
+      currentQuery = currentQuery.eq('user_id', auth.userId);
+    }
+
+    const { data: currentPolicy, error: currentError } = await currentQuery.single();
+
+    if (currentError || !currentPolicy) {
+      return NextResponse.json({ error: 'Policy not found' }, { status: 404 });
+    }
+
+    if (updates.status === 'Renew Done' && currentPolicy.status !== 'Renew Done') {
+      const renewalYears = Number(updates.renewal_years || currentPolicy.renewal_years || 1);
+      const nextDueDate = addYearsToDate(currentPolicy.due_date, renewalYears);
+
+      if (!nextDueDate) {
+        return NextResponse.json({ error: 'Current policy due date is invalid' }, { status: 400 });
+      }
+
+      updates.renewal_years = renewalYears;
+      updates.due_date = nextDueDate;
+
+      if (!currentPolicy.payment_due_date || currentPolicy.payment_due_date === currentPolicy.due_date) {
+        updates.payment_due_date = nextDueDate;
+      }
+    }
+
     let query = supabaseAdmin
       .from('policies')
       .update(updates)

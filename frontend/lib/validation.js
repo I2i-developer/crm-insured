@@ -1,4 +1,6 @@
-export const POLICY_STATUSES = ['Paid', 'Pending', 'Overdue', 'Grace Period', 'Lapsed'];
+export const POLICY_STATUSES = ['Paid', 'Pending', 'Overdue', 'Grace Period', 'Lapsed', 'Renew Done'];
+export const POLICY_RENEWAL_YEARS = [1, 2, 3];
+export const POLICY_DISCOUNT_TYPES = ['NRI discount', 'Family discount'];
 export const ALERT_CHANNELS = ['email', 'sms', 'whatsapp'];
 export const ALERT_TYPES = ['reminder', 'overdue', 'custom'];
 export const DEFAULT_POLICY_TYPE = 'Health Insurance';
@@ -42,6 +44,15 @@ export function parseSpreadsheetDate(value) {
   return null;
 }
 
+function parseAmount(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const match = value.replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+    return match ? Number(match[0]) : Number.NaN;
+  }
+  return Number(value);
+}
+
 export function validatePolicyInput(input, { partial = false } = {}) {
   const errors = [];
   const policy = {};
@@ -59,13 +70,39 @@ export function validatePolicyInput(input, { partial = false } = {}) {
   if (input.policy_type !== undefined) policy.policy_type = cleanString(input.policy_type, 120) || DEFAULT_POLICY_TYPE;
   if (input.insurance_company !== undefined) policy.insurance_company = cleanString(input.insurance_company, 160);
   if (input.policy_number !== undefined) policy.policy_number = cleanString(String(input.policy_number), 80);
+  if (input.plan_name !== undefined) policy.plan_name = cleanString(input.plan_name, 160) || null;
+
+  if (input.renewal_years !== undefined) {
+    const years = Number(input.renewal_years);
+    if (!POLICY_RENEWAL_YEARS.includes(years)) {
+      errors.push('renewal_years must be 1, 2, or 3');
+    } else {
+      policy.renewal_years = years;
+    }
+  } else if (!partial) {
+    policy.renewal_years = 1;
+  }
 
   if (input.premium_amount !== undefined) {
-    const amount = Number(input.premium_amount);
+    const amount = parseAmount(input.premium_amount);
     if (!Number.isFinite(amount) || amount < 0) {
       errors.push('premium_amount must be a non-negative number');
     } else {
       policy.premium_amount = amount;
+    }
+  }
+
+  const sumInsuredInput = input.sum_insured !== undefined ? input.sum_insured : input.sun_insured;
+  if (sumInsuredInput !== undefined) {
+    if (sumInsuredInput === null || sumInsuredInput === '') {
+      policy.sum_insured = null;
+    } else {
+      const amount = parseAmount(sumInsuredInput);
+      if (!Number.isFinite(amount) || amount < 0) {
+        errors.push('sum_insured must be a non-negative number');
+      } else {
+        policy.sum_insured = amount;
+      }
     }
   }
 
@@ -88,11 +125,22 @@ export function validatePolicyInput(input, { partial = false } = {}) {
     policy.email = email;
   }
 
-  if (input.status !== undefined) {
+  if (input.status !== undefined && input.status !== null && String(input.status).trim() !== '') {
     if (!POLICY_STATUSES.includes(input.status)) errors.push('status is invalid');
     else policy.status = input.status;
   } else if (!partial) {
     policy.status = 'Pending';
+  }
+
+  if (input.discount_type !== undefined) {
+    const discountType = cleanString(input.discount_type, 80);
+    if (!discountType) {
+      policy.discount_type = null;
+    } else if (!POLICY_DISCOUNT_TYPES.includes(discountType)) {
+      errors.push('discount_type is invalid');
+    } else {
+      policy.discount_type = discountType;
+    }
   }
 
   if (!partial && !policy.policy_type) {
