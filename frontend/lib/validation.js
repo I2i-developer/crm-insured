@@ -1,4 +1,5 @@
 export const POLICY_STATUSES = ['Paid', 'Pending', 'Overdue', 'Grace Period', 'Lapsed', 'Renew Done'];
+export const POLICY_TYPES = ['Health Insurance', 'Motor Insurance', 'Travel Insurance'];
 export const POLICY_RENEWAL_YEARS = [1, 2, 3];
 export const POLICY_DISCOUNT_TYPES = ['NRI discount', 'Family discount'];
 export const ALERT_CHANNELS = ['email', 'sms', 'whatsapp'];
@@ -72,7 +73,11 @@ export function validatePolicyInput(input, { partial = false } = {}) {
   }
 
   if (input.client_name !== undefined) policy.client_name = cleanString(input.client_name, 160);
-  if (input.policy_type !== undefined) policy.policy_type = cleanString(input.policy_type, 120) || DEFAULT_POLICY_TYPE;
+  if (input.policy_type !== undefined) {
+    const policyType = cleanString(input.policy_type, 120) || DEFAULT_POLICY_TYPE;
+    if (!POLICY_TYPES.includes(policyType)) errors.push('policy_type is invalid');
+    else policy.policy_type = policyType;
+  }
   if (input.insurance_company !== undefined) policy.insurance_company = normalizeInsuranceCompany(input.insurance_company);
   if (input.policy_number !== undefined) policy.policy_number = cleanString(String(input.policy_number), 80);
   if (input.plan_name !== undefined) policy.plan_name = cleanString(input.plan_name, 160) || null;
@@ -147,6 +152,33 @@ export function validatePolicyInput(input, { partial = false } = {}) {
       policy.discount_type = discountType;
     }
   }
+
+  if (input.deductible_applicable !== undefined) {
+    policy.deductible_applicable = input.deductible_applicable === true || input.deductible_applicable === 'true' || input.deductible_applicable === 'Applicable';
+  } else if (!partial) {
+    policy.deductible_applicable = false;
+  }
+
+  if (input.deductible_amount !== undefined) {
+    if (input.deductible_amount === null || input.deductible_amount === '') {
+      policy.deductible_amount = null;
+    } else {
+      const amount = parseAmount(input.deductible_amount);
+      if (!Number.isFinite(amount) || amount < 0) {
+        errors.push('deductible_amount must be a non-negative number');
+      } else {
+        policy.deductible_amount = amount;
+        policy.deductible_applicable = true;
+      }
+    }
+  }
+
+  if (policy.deductible_applicable === false) {
+    policy.deductible_amount = null;
+  }
+
+  if (input.epolicy_pdf_path !== undefined) policy.epolicy_pdf_path = cleanString(input.epolicy_pdf_path, 1000) || null;
+  if (input.epolicy_pdf_name !== undefined) policy.epolicy_pdf_name = cleanString(input.epolicy_pdf_name, 240) || null;
 
   if (!partial && !policy.policy_type) {
     policy.policy_type = DEFAULT_POLICY_TYPE;

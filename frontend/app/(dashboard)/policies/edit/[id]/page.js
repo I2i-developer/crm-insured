@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
-import { HEALTH_INSURANCE_COMPANIES, HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
+import { HEALTH_INSURANCE_COMPANIES, HEALTH_POLICY_TYPE, POLICY_TYPES } from '@/lib/healthPolicy';
 import { POLICY_DISCOUNT_TYPES, POLICY_RENEWAL_YEARS, POLICY_STATUSES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
 import styles from '../../new/page.module.css';
@@ -17,6 +17,8 @@ export default function EditPolicyPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [documentFile, setDocumentFile] = useState(null);
+  const [currentDocument, setCurrentDocument] = useState({ name: '', url: '' });
   const [form, setForm] = useState({
     client_name: '',
     policy_type: HEALTH_POLICY_TYPE,
@@ -28,6 +30,8 @@ export default function EditPolicyPage() {
     sum_insured: '',
     renewal_years: '1',
     discount_type: '',
+    deductible_applicable: 'false',
+    deductible_amount: '',
     due_date: '',
     payment_due_date: '',
     issuance_date: '',
@@ -56,6 +60,8 @@ export default function EditPolicyPage() {
         sum_insured: policy.sum_insured ?? '',
         renewal_years: String(policy.renewal_years || 1),
         discount_type: policy.discount_type || '',
+        deductible_applicable: policy.deductible_applicable ? 'true' : 'false',
+        deductible_amount: policy.deductible_amount ?? '',
         due_date: policy.due_date,
         payment_due_date: policy.payment_due_date || '',
         issuance_date: policy.issuance_date,
@@ -63,12 +69,42 @@ export default function EditPolicyPage() {
         email: policy.email || '',
         status: policy.status
       });
+      setCurrentDocument({
+        name: policy.epolicy_pdf_name || '',
+        url: policy.epolicy_pdf_signed_url || ''
+      });
     } catch (err) {
       setError('Failed to load policy');
       toast.error('Failed to load policy.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDocumentChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) {
+      setDocumentFile(null);
+      return;
+    }
+
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      const message = 'Please upload a PDF e-policy document.';
+      setError(message);
+      toast.error(message);
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      const message = 'E-policy PDF must be 8MB or smaller.';
+      setError(message);
+      toast.error(message);
+      e.target.value = '';
+      return;
+    }
+
+    setDocumentFile(file);
   };
 
   const handleChange = (e) => {
@@ -92,12 +128,26 @@ export default function EditPolicyPage() {
         premium_amount: parseFloat(form.premium_amount),
         sum_insured: form.sum_insured === '' ? null : parseFloat(form.sum_insured),
         renewal_years: Number(form.renewal_years || 1),
-        discount_type: form.discount_type || null
+        discount_type: form.discount_type || null,
+        deductible_applicable: form.deductible_applicable === 'true',
+        deductible_amount: form.deductible_applicable === 'true' && form.deductible_amount !== '' ? parseFloat(form.deductible_amount) : null
       };
       delete payload.other_company;
 
       await api.put(`/policies/${params.id}`, payload);
-      toast.success('Health policy updated successfully.');
+      let uploadedDocument = false;
+      if (documentFile) {
+        try {
+          const documentData = new FormData();
+          documentData.append('document', documentFile);
+          await api.upload(`/policies/${params.id}/document`, documentData);
+          uploadedDocument = true;
+        } catch (uploadError) {
+          toast.warning(uploadError.message || 'Policy was updated, but the e-policy PDF could not be uploaded.');
+        }
+      }
+
+      toast.success(uploadedDocument ? 'Policy and e-policy PDF updated successfully.' : 'Policy updated successfully.');
       router.push('/policies');
     } catch (err) {
       const message = err.message || 'Failed to update policy';
@@ -121,8 +171,8 @@ export default function EditPolicyPage() {
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <h1>Edit Health Policy</h1>
-        <p>Update health policy details</p>
+        <h1>Edit Policy</h1>
+        <p>Update policy details</p>
       </header>
 
       <form onSubmit={handleSubmit} className={styles.form}>
@@ -165,7 +215,7 @@ export default function EditPolicyPage() {
           <div className={styles.field}>
             <label>Policy Type</label>
             <select name="policy_type" value={form.policy_type} onChange={handleChange}>
-              <option value={HEALTH_POLICY_TYPE}>{HEALTH_POLICY_TYPE}</option>
+              {POLICY_TYPES.map(type => <option key={type.name} value={type.name}>{type.name}</option>)}
             </select>
           </div>
 
@@ -216,12 +266,14 @@ export default function EditPolicyPage() {
             />
           </div>
 
-          <div className={styles.field}>
-            <label>Renewal Paid For</label>
-            <select name="renewal_years" value={form.renewal_years} onChange={handleChange}>
-              {POLICY_RENEWAL_YEARS.map(year => <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>)}
-            </select>
-          </div>
+          {form.policy_type !== 'Travel Insurance' && (
+            <div className={styles.field}>
+              <label>Renewal Paid For</label>
+              <select name="renewal_years" value={form.renewal_years} onChange={handleChange}>
+                {POLICY_RENEWAL_YEARS.map(year => <option key={year} value={year}>{year} year{year > 1 ? 's' : ''}</option>)}
+              </select>
+            </div>
+          )}
 
           <div className={styles.field}>
             <label>Discount</label>
@@ -232,7 +284,30 @@ export default function EditPolicyPage() {
           </div>
 
           <div className={styles.field}>
-            <label>Due Date *</label>
+            <label>Deductible</label>
+            <select name="deductible_applicable" value={form.deductible_applicable} onChange={handleChange}>
+              <option value="false">Not Applicable</option>
+              <option value="true">Applicable</option>
+            </select>
+          </div>
+
+          {form.deductible_applicable === 'true' && (
+            <div className={styles.field}>
+              <label>Deductible Amount *</label>
+              <input
+                type="number"
+                name="deductible_amount"
+                value={form.deductible_amount}
+                onChange={handleChange}
+                required
+                min="0"
+                step="0.01"
+              />
+            </div>
+          )}
+
+          <div className={styles.field}>
+            <label>{form.policy_type === 'Travel Insurance' ? 'Policy Expiry Date *' : 'Renewal / Due Date *'}</label>
             <input
               type="date"
               name="due_date"
@@ -288,6 +363,22 @@ export default function EditPolicyPage() {
             <select name="status" value={form.status} onChange={handleChange}>
               {POLICY_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
+          </div>
+
+          <div className={styles.field}>
+            <label>E-policy PDF</label>
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={handleDocumentChange}
+            />
+            <small>
+              {currentDocument.name ? (
+                <>
+                  Current file: {currentDocument.url ? <a href={currentDocument.url} target="_blank" rel="noreferrer">{currentDocument.name}</a> : currentDocument.name}. Upload a new PDF to replace it.
+                </>
+              ) : 'Optional PDF upload, maximum 8MB.'}
+            </small>
           </div>
         </div>
 

@@ -2,13 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
-import { HEALTH_POLICY_DESCRIPTION, HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
+import { HEALTH_POLICY_TYPE, POLICY_TYPES } from '@/lib/healthPolicy';
 import { useToast } from '@/components/ToastProvider';
 import styles from '@/components/policy-report.module.css';
 
-const DEFAULT_TYPES = [
-  { name: HEALTH_POLICY_TYPE, description: HEALTH_POLICY_DESCRIPTION }
-];
+const DEFAULT_TYPES = POLICY_TYPES;
 
 export default function PolicyTypesPage() {
   const toast = useToast();
@@ -23,7 +21,7 @@ export default function PolicyTypesPage() {
       })
       .catch(error => {
         console.error('Failed to load policy types:', error);
-        toast.error('Failed to load health policy type data.');
+        toast.error('Failed to load policy type data.');
         if (active) setPolicies([]);
       })
       .finally(() => {
@@ -47,18 +45,18 @@ export default function PolicyTypesPage() {
     <div className={styles.container}>
       <header className={styles.header}>
         <div>
-          <h1>Health Policy Type</h1>
-          <p>This CRM is currently dedicated to health insurance policy servicing, renewals, payments, and client follow-up.</p>
+          <h1>Policy Types</h1>
+          <p>Manage enabled policy categories for health, motor, and one-time travel insurance servicing.</p>
         </div>
       </header>
 
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
-          <span className={styles.statLabel}>Active Type</span>
+          <span className={styles.statLabel}>Active Types</span>
           <span className={styles.statValue}>{DEFAULT_TYPES.length}</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statLabel}>Health Policies</span>
+          <span className={styles.statLabel}>Classified Policies</span>
           <span className={styles.statValue}>{loading ? '-' : policies.length}</span>
         </div>
         <div className={styles.statCard}>

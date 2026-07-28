@@ -5,6 +5,7 @@ import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
 import { validatePolicyInput } from '@/lib/validation';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const POLICY_DOCUMENT_BUCKET = 'policy-documents';
 
 function isValidPolicyId(id) {
   return typeof id === 'string' && UUID_PATTERN.test(id);
@@ -25,6 +26,24 @@ function addYearsToDate(value, years) {
 async function getPolicyId(params) {
   const resolvedParams = await params;
   return resolvedParams?.id;
+}
+
+async function addPolicyDocumentSignedUrl(supabaseAdmin, policy) {
+  if (!policy?.epolicy_pdf_path) return policy;
+
+  const { data, error } = await supabaseAdmin.storage
+    .from(POLICY_DOCUMENT_BUCKET)
+    .createSignedUrl(policy.epolicy_pdf_path, 60 * 10);
+
+  if (error) {
+    console.warn('Policy document signed URL error:', error.message);
+    return policy;
+  }
+
+  return {
+    ...policy,
+    epolicy_pdf_signed_url: data?.signedUrl || ''
+  };
 }
 
 export async function GET(request, { params }) {
@@ -55,7 +74,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Policy not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ policy: data });
+    return NextResponse.json({ policy: await addPolicyDocumentSignedUrl(supabaseAdmin, data) });
   } catch (error) {
     console.error('Get policy error:', error);
     return NextResponse.json({ error: 'Failed to fetch policy' }, { status: 500 });

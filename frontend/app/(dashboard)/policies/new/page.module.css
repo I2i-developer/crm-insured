@@ -56,6 +56,18 @@
   font-weight: 800;
 }
 
+.field small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
+.field small a {
+  color: var(--primary);
+  font-weight: 900;
+}
+
 .field input,
 .field select,
 .field textarea {

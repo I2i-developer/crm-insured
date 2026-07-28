@@ -133,6 +133,7 @@ export default function PolicyDetailsPage() {
 
   if (!policy) return null;
 
+  const isTravelPolicy = policy.policy_type === 'Travel Insurance';
   const detailGroups = [
     {
       title: 'Policy Information',
@@ -144,8 +145,9 @@ export default function PolicyDetailsPage() {
         ['Status', policy.status],
         ['Premium Amount', formatCurrency(policy.premium_amount)],
         ['Sum Insured', policy.sum_insured ? formatCurrency(policy.sum_insured) : '-'],
-        ['Renewal Paid For', `${policy.renewal_years || 1} year${Number(policy.renewal_years || 1) > 1 ? 's' : ''}`],
-        ['Discount', policy.discount_type || 'No discount']
+        ['Renewal Paid For', isTravelPolicy ? 'One-time travel policy' : `${policy.renewal_years || 1} year${Number(policy.renewal_years || 1) > 1 ? 's' : ''}`],
+        ['Discount', policy.discount_type || 'No discount'],
+        ['Deductible', policy.deductible_applicable ? formatCurrency(policy.deductible_amount) : 'Not Applicable']
       ]
     },
     {
@@ -160,8 +162,9 @@ export default function PolicyDetailsPage() {
       title: 'Dates',
       items: [
         ['Issuance Date', formatDate(policy.issuance_date)],
-        ['Renewal / Due Date', formatDate(policy.due_date)],
+        [isTravelPolicy ? 'Policy Expiry Date' : 'Renewal / Due Date', formatDate(policy.due_date)],
         ['Payment Due Date', formatDate(policy.payment_due_date || policy.due_date)],
+        ['E-policy Uploaded', formatDateTime(policy.epolicy_pdf_uploaded_at)],
         ['Created', formatDateTime(policy.created_at)],
         ['Last Updated', formatDateTime(policy.updated_at)]
       ]
@@ -218,6 +221,23 @@ export default function PolicyDetailsPage() {
         ))}
       </section>
 
+      <section className={styles.documentPanel}>
+        <div className={styles.panel}>
+          <h2>E-policy Document</h2>
+          {policy.epolicy_pdf_signed_url ? (
+            <a className={styles.documentLink} href={policy.epolicy_pdf_signed_url} target="_blank" rel="noreferrer">
+              <DocumentIcon />
+              <span>
+                <strong>{policy.epolicy_pdf_name || 'View e-policy PDF'}</strong>
+                <small>Signed link opens in a new tab</small>
+              </span>
+            </a>
+          ) : (
+            <div className={styles.empty}>No e-policy PDF uploaded yet.</div>
+          )}
+        </div>
+      </section>
+
       <section className={styles.historyGrid}>
         <div className={styles.panel}>
           <h2>Policy History</h2>
@@ -269,5 +289,15 @@ export default function PolicyDetailsPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function DocumentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <path d="M14 2v6h6"/>
+      <path d="M8 13h8M8 17h6"/>
+    </svg>
   );
 }

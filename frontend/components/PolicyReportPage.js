@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
-import { HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
+import { HEALTH_POLICY_TYPE, POLICY_TYPES } from '@/lib/healthPolicy';
 import { POLICY_DISCOUNT_TYPES, POLICY_STATUSES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
 import styles from './policy-report.module.css';
@@ -91,9 +91,12 @@ export default function PolicyReportPage({
   const [range, setRange] = useState(daysAhead);
   const [advancedFilters, setAdvancedFilters] = useState({
     status: '',
+    policyType: '',
     policyNumber: '',
     planName: '',
     discountType: '',
+    deductible: '',
+    documentStatus: '',
     dateType: 'due',
     dateFrom: '',
     dateTo: '',
@@ -189,9 +192,20 @@ export default function PolicyReportPage({
     return basePolicies.filter(policy => {
       if (policyNumber && !String(policy.policy_number || '').toLowerCase().includes(policyNumber)) return false;
       if (planName && !String(policy.plan_name || '').toLowerCase().includes(planName)) return false;
+      if (advancedFilters.policyType && (policy.policy_type || HEALTH_POLICY_TYPE) !== advancedFilters.policyType) return false;
       if (advancedFilters.discountType) {
         const discount = policy.discount_type || 'none';
         if (advancedFilters.discountType !== discount) return false;
+      }
+      if (advancedFilters.deductible) {
+        const hasDeductible = Boolean(policy.deductible_applicable);
+        if (advancedFilters.deductible === 'applicable' && !hasDeductible) return false;
+        if (advancedFilters.deductible === 'not_applicable' && hasDeductible) return false;
+      }
+      if (advancedFilters.documentStatus) {
+        const hasDocument = Boolean(policy.epolicy_pdf_path || policy.epolicy_pdf_name);
+        if (advancedFilters.documentStatus === 'uploaded' && !hasDocument) return false;
+        if (advancedFilters.documentStatus === 'missing' && hasDocument) return false;
       }
       if (advancedFilters.dateFrom || advancedFilters.dateTo) {
         if (!isDateWithinRange(getPolicyDateByType(policy, advancedFilters.dateType), advancedFilters.dateFrom, advancedFilters.dateTo)) {
@@ -218,9 +232,12 @@ export default function PolicyReportPage({
   const clearAdvancedFilters = () => {
     setAdvancedFilters({
       status: '',
+      policyType: '',
       policyNumber: '',
       planName: '',
       discountType: '',
+      deductible: '',
+      documentStatus: '',
       dateType: 'due',
       dateFrom: '',
       dateTo: '',
@@ -309,10 +326,24 @@ export default function PolicyReportPage({
               onChange={event => setAdvancedFilters(prev => ({ ...prev, planName: event.target.value }))}
               placeholder="Plan name"
             />
+            <select className={styles.select} value={advancedFilters.policyType} onChange={event => setAdvancedFilters(prev => ({ ...prev, policyType: event.target.value }))}>
+              <option value="">All policy types</option>
+              {POLICY_TYPES.map(item => <option key={item.name} value={item.name}>{item.name}</option>)}
+            </select>
             <select className={styles.select} value={advancedFilters.discountType} onChange={event => setAdvancedFilters(prev => ({ ...prev, discountType: event.target.value }))}>
               <option value="">All discounts</option>
               <option value="none">No discount</option>
               {POLICY_DISCOUNT_TYPES.map(item => <option key={item} value={item}>{item}</option>)}
+            </select>
+            <select className={styles.select} value={advancedFilters.deductible} onChange={event => setAdvancedFilters(prev => ({ ...prev, deductible: event.target.value }))}>
+              <option value="">All deductibles</option>
+              <option value="applicable">Deductible applicable</option>
+              <option value="not_applicable">Not applicable</option>
+            </select>
+            <select className={styles.select} value={advancedFilters.documentStatus} onChange={event => setAdvancedFilters(prev => ({ ...prev, documentStatus: event.target.value }))}>
+              <option value="">All documents</option>
+              <option value="uploaded">PDF uploaded</option>
+              <option value="missing">PDF missing</option>
             </select>
             <select className={styles.select} value={advancedFilters.dateType} onChange={event => setAdvancedFilters(prev => ({ ...prev, dateType: event.target.value }))}>
               <option value="due">Due date</option>
