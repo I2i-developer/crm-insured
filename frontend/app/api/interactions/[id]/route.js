@@ -11,7 +11,8 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
+    const resolvedParams = await params;
+    const id = resolvedParams?.id;
     const { remark } = await request.json();
     const cleanRemark = cleanString(remark, 2000);
 
@@ -57,7 +58,8 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
+    const resolvedParams = await params;
+    const id = resolvedParams?.id;
 
     const supabaseAdmin = getSupabaseAdmin();
     let query = supabaseAdmin

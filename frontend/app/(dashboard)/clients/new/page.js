@@ -203,7 +203,7 @@ export default function NewClientPage() {
           </div>
 
           <div className={styles.field}>
-            <label>Sum Insured (INR)</label>
+            <label>{form.policy_type === 'Motor Insurance' ? 'IDV (INR)' : 'Sum Insured (INR)'}</label>
             <input
               type="number"
               name="sum_insured"

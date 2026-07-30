@@ -255,7 +255,7 @@ export default function EditPolicyPage() {
           </div>
 
           <div className={styles.field}>
-            <label>Sum Insured</label>
+            <label>{form.policy_type === 'Motor Insurance' ? 'IDV' : 'Sum Insured'}</label>
             <input
               type="number"
               name="sum_insured"

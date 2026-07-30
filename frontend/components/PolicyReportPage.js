@@ -386,7 +386,7 @@ export default function PolicyReportPage({
               min="0"
               value={advancedFilters.sumInsuredFrom}
               onChange={event => setAdvancedFilters(prev => ({ ...prev, sumInsuredFrom: event.target.value }))}
-              placeholder="Sum insured min"
+              placeholder="Sum insured / IDV min"
             />
             <input
               className={styles.input}
@@ -394,7 +394,7 @@ export default function PolicyReportPage({
               min="0"
               value={advancedFilters.sumInsuredTo}
               onChange={event => setAdvancedFilters(prev => ({ ...prev, sumInsuredTo: event.target.value }))}
-              placeholder="Sum insured max"
+              placeholder="Sum insured / IDV max"
             />
             <button type="button" className={styles.clearFiltersBtn} onClick={clearAdvancedFilters}>
               Clear filters

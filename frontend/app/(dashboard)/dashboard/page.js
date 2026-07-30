@@ -200,23 +200,19 @@ export default function DashboardPage() {
   const roleView = {
     super_admin: {
       description: 'Full CRM governance view for testing, user access, audit tracking, and health policy operations.',
-      eyebrow: 'System Summary',
-      totalLabel: 'team health policies under management'
+      eyebrow: 'System Summary'
     },
     admin: {
       description: 'Team-head view for monitoring leads, renewals, payment risk, and agent follow-up priorities.',
-      eyebrow: 'Team Summary',
-      totalLabel: 'team health policies under management'
+      eyebrow: 'Team Summary'
     },
     team_member: {
       description: 'Focused view of your assigned health policies, renewals, payment follow-ups, and action queue.',
-      eyebrow: 'My Summary',
-      totalLabel: 'health policies assigned to you'
+      eyebrow: 'My Summary'
     }
   }[user.role] || {
     description: 'Health policy portfolio summary, renewal risk, payment movement, and team action signals.',
-    eyebrow: 'Executive Summary',
-    totalLabel: 'health policies under management'
+    eyebrow: 'Executive Summary'
   };
 
   return (
@@ -237,7 +233,7 @@ export default function DashboardPage() {
       <section className={styles.summaryPanel}>
         <div>
           <span className={styles.eyebrow}>{roleView.eyebrow}</span>
-          <h2>{loading ? 'Loading portfolio...' : `${metrics.activeCount} ${roleView.totalLabel}`}</h2>
+          <h2>{loading ? 'Loading portfolio...' : `${metrics.activeCount} Number of Policies`}</h2>
           <p>
             {metrics.riskCount > 0
               ? `${metrics.riskCount} policies need attention across overdue, grace, or lapsed stages.`

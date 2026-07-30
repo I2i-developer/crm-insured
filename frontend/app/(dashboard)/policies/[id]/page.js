@@ -68,6 +68,9 @@ export default function PolicyDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [remark, setRemark] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [editingLogId, setEditingLogId] = useState(null);
+  const [editingRemark, setEditingRemark] = useState('');
+  const [updatingRemark, setUpdatingRemark] = useState(false);
 
   const fetchDetails = async () => {
     setLoading(true);
@@ -127,6 +130,35 @@ export default function PolicyDetailsPage() {
     }
   };
 
+  const startEditingRemark = (log) => {
+    setEditingLogId(log.id);
+    setEditingRemark(log.remark || '');
+  };
+
+  const cancelEditingRemark = () => {
+    setEditingLogId(null);
+    setEditingRemark('');
+  };
+
+  const handleUpdateRemark = async (logId) => {
+    if (!editingRemark.trim()) {
+      toast.warning('Remark cannot be empty.');
+      return;
+    }
+
+    setUpdatingRemark(true);
+    try {
+      const data = await api.put(`/interactions/${logId}`, { remark: editingRemark });
+      setLogs(current => current.map(log => (log.id === logId ? data.log : log)));
+      toast.success('Remark updated successfully.');
+      cancelEditingRemark();
+    } catch (error) {
+      toast.error(error.message || 'Failed to update remark.');
+    } finally {
+      setUpdatingRemark(false);
+    }
+  };
+
   if (loading) {
     return <div className={styles.loading}>Loading policy details...</div>;
   }
@@ -134,6 +166,7 @@ export default function PolicyDetailsPage() {
   if (!policy) return null;
 
   const isTravelPolicy = policy.policy_type === 'Travel Insurance';
+  const isMotorPolicy = policy.policy_type === 'Motor Insurance';
   const detailGroups = [
     {
       title: 'Policy Information',
@@ -144,7 +177,7 @@ export default function PolicyDetailsPage() {
         ['Insurance Company', policy.insurance_company],
         ['Status', policy.status],
         ['Premium Amount', formatCurrency(policy.premium_amount)],
-        ['Sum Insured', policy.sum_insured ? formatCurrency(policy.sum_insured) : '-'],
+        [isMotorPolicy ? 'IDV' : 'Sum Insured', policy.sum_insured ? formatCurrency(policy.sum_insured) : '-'],
         ['Renewal Paid For', isTravelPolicy ? 'One-time travel policy' : `${policy.renewal_years || 1} year${Number(policy.renewal_years || 1) > 1 ? 's' : ''}`],
         ['Discount', policy.discount_type || 'No discount'],
         ['Deductible', policy.deductible_applicable ? formatCurrency(policy.deductible_amount) : 'Not Applicable']
@@ -280,8 +313,38 @@ export default function PolicyDetailsPage() {
             <div className={styles.logList}>
               {logs.map(log => (
                 <article key={log.id} className={styles.logItem}>
-                  <p>{log.remark}</p>
-                  <time>{formatDateTime(log.created_at)}</time>
+                  {editingLogId === log.id ? (
+                    <div className={styles.logEditForm}>
+                      <textarea
+                        value={editingRemark}
+                        onChange={event => setEditingRemark(event.target.value)}
+                        maxLength={2000}
+                      />
+                      <div className={styles.logActions}>
+                        <button type="button" onClick={cancelEditingRemark} className={styles.secondarySmallBtn}>
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateRemark(log.id)}
+                          className={styles.primarySmallBtn}
+                          disabled={updatingRemark || !editingRemark.trim()}
+                        >
+                          {updatingRemark ? 'Saving...' : 'Save'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={styles.logHeader}>
+                        <time>{formatDateTime(log.created_at)}</time>
+                        <button type="button" onClick={() => startEditingRemark(log)} title="Edit remark" aria-label="Edit remark">
+                          <EditIcon />
+                        </button>
+                      </div>
+                      <p>{log.remark}</p>
+                    </>
+                  )}
                 </article>
               ))}
             </div>
@@ -289,6 +352,15 @@ export default function PolicyDetailsPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function EditIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M12 20h9"/>
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+    </svg>
   );
 }
 
