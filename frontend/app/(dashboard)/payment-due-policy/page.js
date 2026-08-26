@@ -7,6 +7,7 @@ export default function PaymentDuePolicyPage() {
       description="Pending policies whose premium due dates have passed and need immediate collection action."
       mode="paymentDue"
       status="Pending"
+      policyBucket="renewal"
     />
   );
 }

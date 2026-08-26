@@ -35,6 +35,7 @@ export default function PoliciesPage() {
     search: searchParams.get('search') || '',
     company: searchParams.get('company') || '',
     status: searchParams.get('filter') || '',
+    policy_bucket: 'renewal',
     due_date_from: '',
     due_date_to: ''
   });
@@ -50,7 +51,7 @@ export default function PoliciesPage() {
 
   const fetchStats = async () => {
     try {
-      const data = await api.get('/policies/stats');
+      const data = await api.get('/policies/stats?policy_bucket=renewal');
       setStats(data.stats);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -149,8 +150,8 @@ export default function PoliciesPage() {
     <div className={styles.container}>
       <header className={styles.header}>
         <div>
-          <h1>Policies</h1>
-          <p>Manage your client policies and track renewals</p>
+          <h1>Policies to be Renewed</h1>
+          <p>Policies to be renewed, separated from fresh business records</p>
         </div>
         <div className={styles.headerActions}>
           <Link href="/policies/import" className={styles.importBtn}>Import</Link>

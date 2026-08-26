@@ -4,14 +4,55 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { HEALTH_POLICY_TYPE, POLICY_TYPES } from '@/lib/healthPolicy';
-import { POLICY_DISCOUNT_TYPES, POLICY_STATUSES } from '@/lib/validation';
+import { POLICY_BUCKETS, POLICY_DISCOUNT_TYPES, POLICY_STATUSES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
 import styles from './policy-report.module.css';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MONTH_OPTIONS = [
+  { value: '01', label: 'January' },
+  { value: '02', label: 'February' },
+  { value: '03', label: 'March' },
+  { value: '04', label: 'April' },
+  { value: '05', label: 'May' },
+  { value: '06', label: 'June' },
+  { value: '07', label: 'July' },
+  { value: '08', label: 'August' },
+  { value: '09', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' }
+];
 
 function toDateInput(date) {
   return date.toISOString().slice(0, 10);
+}
+
+function getCalendarYearRange(date = new Date()) {
+  const year = date.getFullYear();
+  return {
+    from: `${year}-01-01`,
+    to: `${year}-12-31`
+  };
+}
+
+function getFreshPolicyDateRange(month, year) {
+  const selectedYear = year || (month ? String(new Date().getFullYear()) : '');
+  if (!selectedYear) return null;
+
+  if (!month) {
+    return {
+      from: `${selectedYear}-01-01`,
+      to: `${selectedYear}-12-31`
+    };
+  }
+
+  const monthIndex = Number(month) - 1;
+  const end = new Date(Number(selectedYear), monthIndex + 1, 0);
+  return {
+    from: `${selectedYear}-${month}-01`,
+    to: `${selectedYear}-${month}-${String(end.getDate()).padStart(2, '0')}`
+  };
 }
 
 function formatDate(date) {
@@ -76,12 +117,17 @@ function getClientInitial(name) {
   return (cleaned.charAt(0) || 'C').toUpperCase();
 }
 
+function formatPolicyBucket(value) {
+  return value === 'fresh' ? 'Fresh Policy' : 'Policy to be Renewed';
+}
+
 export default function PolicyReportPage({
   title,
   description,
   mode = 'all',
   status = '',
-  daysAhead = 30
+  daysAhead = 30,
+  policyBucket = ''
 }) {
   const toast = useToast();
   const [policies, setPolicies] = useState([]);
@@ -89,8 +135,11 @@ export default function PolicyReportPage({
   const [search, setSearch] = useState('');
   const [company, setCompany] = useState('');
   const [range, setRange] = useState(daysAhead);
+  const [freshFilters, setFreshFilters] = useState({ month: '', year: '' });
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState({
     status: '',
+    policyBucket: '',
     policyType: '',
     policyNumber: '',
     planName: '',
@@ -105,7 +154,8 @@ export default function PolicyReportPage({
     sumInsuredFrom: '',
     sumInsuredTo: ''
   });
-  const showAdvancedFilters = mode === 'all';
+  const isFreshPolicies = mode === 'freshPolicies';
+  const showAdvancedFilters = mode === 'all' || isFreshPolicies;
 
   const query = useMemo(() => {
     const today = new Date();
@@ -113,13 +163,15 @@ export default function PolicyReportPage({
     const params = new URLSearchParams({
       page: '1',
       limit: '1000',
-      sort_by: mode === 'paymentDue' || mode === 'upcomingPayment' ? 'payment_due_date' : 'due_date',
+      sort_by: mode === 'paymentDue' || mode === 'upcomingPayment' ? 'payment_due_date' : isFreshPolicies ? 'created_at' : 'due_date',
       sort_order: 'asc'
     });
 
     if (search) params.set('search', search);
     if (company) params.set('company', company);
     if (status || advancedFilters.status) params.set('status', status || advancedFilters.status);
+    const bucket = policyBucket || (isFreshPolicies ? 'fresh' : advancedFilters.policyBucket);
+    if (bucket) params.set('policy_bucket', bucket);
 
     if (mode === 'expired') {
       params.set('due_date_to', toDateInput(new Date(today.getTime() - DAY_MS)));
@@ -130,8 +182,22 @@ export default function PolicyReportPage({
       params.set('due_date_to', toDateInput(new Date(today.getTime() + Number(range) * DAY_MS)));
     }
 
+    if (mode === 'pendingRenewals') {
+      const calendarYear = getCalendarYearRange(today);
+      params.set('due_date_from', calendarYear.from);
+      params.set('due_date_to', calendarYear.to);
+    }
+
+    if (isFreshPolicies) {
+      const freshRange = getFreshPolicyDateRange(freshFilters.month, freshFilters.year);
+      if (freshRange) {
+        params.set('created_at_from', freshRange.from);
+        params.set('created_at_to', freshRange.to);
+      }
+    }
+
     return params.toString();
-  }, [advancedFilters.status, company, mode, range, search, status]);
+  }, [advancedFilters.policyBucket, advancedFilters.status, company, freshFilters, isFreshPolicies, mode, policyBucket, range, search, status]);
 
   useEffect(() => {
     let active = true;
@@ -229,9 +295,17 @@ export default function PolicyReportPage({
     return [...new Set(policies.map(policy => policy.insurance_company).filter(Boolean))].sort();
   }, [policies]);
 
+  const policyYears = useMemo(() => {
+    const years = policies
+      .map(policy => new Date(isFreshPolicies ? policy.created_at : policy.issuance_date || policy.created_at || policy.due_date).getFullYear())
+      .filter(year => Number.isFinite(year));
+    return [...new Set([new Date().getFullYear(), ...years])].sort((a, b) => b - a);
+  }, [isFreshPolicies, policies]);
+
   const clearAdvancedFilters = () => {
     setAdvancedFilters({
       status: '',
+      policyBucket: '',
       policyType: '',
       policyNumber: '',
       planName: '',
@@ -246,16 +320,23 @@ export default function PolicyReportPage({
       sumInsuredFrom: '',
       sumInsuredTo: ''
     });
+    setFreshFilters({ month: '', year: '' });
   };
 
   const totalPremium = filteredPolicies.reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
   const pendingCount = filteredPolicies.filter(policy => policy.status === 'Pending').length;
-  const urgentCount = filteredPolicies.filter(policy => {
+  const createdThisMonthCount = filteredPolicies.filter(policy => {
+    const issued = new Date(policy.created_at || policy.issuance_date);
+    const now = new Date();
+    return !Number.isNaN(issued.getTime()) && issued.getFullYear() === now.getFullYear() && issued.getMonth() === now.getMonth();
+  }).length;
+  const urgentCount = isFreshPolicies ? createdThisMonthCount : filteredPolicies.filter(policy => {
     const due = new Date(mode === 'paymentDue' || mode === 'upcomingPayment' ? getPolicyPaymentDate(policy) : policy.due_date);
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     return due <= new Date(now.getTime() + 7 * DAY_MS);
   }).length;
+  const dateColumnLabel = isFreshPolicies ? 'Created Date' : mode === 'paymentDue' || mode === 'upcomingPayment' ? 'Payment Due' : 'Due Date';
 
   return (
     <div className={styles.container}>
@@ -272,7 +353,7 @@ export default function PolicyReportPage({
 
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
-          <span className={styles.statLabel}>Policies</span>
+          <span className={styles.statLabel}>{isFreshPolicies ? 'Fresh Policies' : 'Policies'}</span>
           <span className={styles.statValue}>{loading ? '-' : filteredPolicies.length}</span>
         </div>
         <div className={styles.statCard}>
@@ -280,17 +361,29 @@ export default function PolicyReportPage({
           <span className={styles.statValue}>{loading ? '-' : pendingCount}</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statLabel}>Urgent Window</span>
+          <span className={styles.statLabel}>{isFreshPolicies ? 'Created This Month' : 'Urgent Window'}</span>
           <span className={styles.statValue}>{loading ? '-' : urgentCount}</span>
         </div>
         <div className={styles.statCard}>
-          <span className={styles.statLabel}>Premium Value</span>
+          <span className={styles.statLabel}>{isFreshPolicies ? 'Fresh Premium' : 'Premium Value'}</span>
           <span className={styles.statValue}>{loading ? '-' : formatCurrency(totalPremium)}</span>
         </div>
       </div>
 
       <section className={styles.panel}>
-        <h2 className={styles.panelTitle}>Filters</h2>
+        <div className={styles.panelToolbar}>
+          <h2 className={styles.panelTitle}>Filters</h2>
+          {showAdvancedFilters && (
+            <button
+              type="button"
+              className={styles.showMoreBtn}
+              onClick={() => setFiltersExpanded(current => !current)}
+              aria-expanded={filtersExpanded}
+            >
+              {filtersExpanded ? 'Show less filters' : 'Show more filters'}
+            </button>
+          )}
+        </div>
         <div className={styles.filters}>
           <input className={styles.input} value={search} onChange={event => setSearch(event.target.value)} placeholder="Search client name" />
           <select className={styles.select} value={company} onChange={event => setCompany(event.target.value)}>
@@ -303,6 +396,26 @@ export default function PolicyReportPage({
               {POLICY_STATUSES.map(item => <option key={item} value={item}>{item}</option>)}
             </select>
           )}
+          {isFreshPolicies && (
+            <>
+              <select
+                className={styles.select}
+                value={freshFilters.month}
+                onChange={event => setFreshFilters(prev => ({ ...prev, month: event.target.value, year: prev.year || String(new Date().getFullYear()) }))}
+              >
+                <option value="">All months</option>
+                {MONTH_OPTIONS.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </select>
+              <select
+                className={styles.select}
+                value={freshFilters.year}
+                onChange={event => setFreshFilters(prev => ({ ...prev, year: event.target.value }))}
+              >
+                <option value="">All years</option>
+                {policyYears.map(year => <option key={year} value={year}>{year}</option>)}
+              </select>
+            </>
+          )}
           {(mode === 'upcomingExpiry' || mode === 'upcomingPayment') && (
             <select className={styles.select} value={range} onChange={event => setRange(event.target.value)}>
               <option value="7">Next 7 days</option>
@@ -312,7 +425,7 @@ export default function PolicyReportPage({
             </select>
           )}
         </div>
-        {showAdvancedFilters && (
+        {showAdvancedFilters && filtersExpanded && (
           <div className={styles.advancedFilters}>
             <input
               className={styles.input}
@@ -326,6 +439,12 @@ export default function PolicyReportPage({
               onChange={event => setAdvancedFilters(prev => ({ ...prev, planName: event.target.value }))}
               placeholder="Plan name"
             />
+            {mode === 'all' && (
+              <select className={styles.select} value={advancedFilters.policyBucket} onChange={event => setAdvancedFilters(prev => ({ ...prev, policyBucket: event.target.value }))}>
+                <option value="">All sections</option>
+                {POLICY_BUCKETS.map(item => <option key={item} value={item}>{formatPolicyBucket(item)}</option>)}
+              </select>
+            )}
             <select className={styles.select} value={advancedFilters.policyType} onChange={event => setAdvancedFilters(prev => ({ ...prev, policyType: event.target.value }))}>
               <option value="">All policy types</option>
               {POLICY_TYPES.map(item => <option key={item.name} value={item.name}>{item.name}</option>)}
@@ -415,8 +534,9 @@ export default function PolicyReportPage({
                 <th>Client</th>
                 <th>Policy #</th>
                 <th>Company</th>
+                <th>Section</th>
                 <th>Type</th>
-                <th>{mode === 'paymentDue' || mode === 'upcomingPayment' ? 'Payment Due' : 'Due Date'}</th>
+                <th>{dateColumnLabel}</th>
                 <th>Premium</th>
                 <th>Status</th>
                 <th>Action</th>
@@ -433,8 +553,9 @@ export default function PolicyReportPage({
                   </td>
                   <td className={styles.muted}>{policy.policy_number}</td>
                   <td>{policy.insurance_company}</td>
+                  <td>{formatPolicyBucket(policy.policy_bucket)}</td>
                   <td>{policy.policy_type || HEALTH_POLICY_TYPE}</td>
-                  <td>{formatDate(mode === 'paymentDue' || mode === 'upcomingPayment' ? getPolicyPaymentDate(policy) : policy.due_date)}</td>
+                  <td>{formatDate(isFreshPolicies ? policy.created_at : mode === 'paymentDue' || mode === 'upcomingPayment' ? getPolicyPaymentDate(policy) : policy.due_date)}</td>
                   <td className={styles.amount}>{formatCurrency(policy.premium_amount)}</td>
                   <td><span className={`${styles.badge} ${statusClass(policy.status)}`}>{policy.status}</span></td>
                   <td><Link className={`${styles.secondaryBtn} ${styles.iconBtn}`} href={`/policies/${policy.id}`} title="Open policy details" aria-label="Open policy details"><OpenIcon /></Link></td>

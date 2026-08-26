@@ -4,10 +4,10 @@ export default function UpcomingRenewalsPage() {
   return (
     <PolicyReportPage
       title="Upcoming Renewals"
-      description="Health policies due soon, separated from the dashboard for focused renewal follow-up."
-      mode="upcomingExpiry"
+      description="Pending renewal policies due from 1 Jan to 31 Dec of the current year."
+      mode="pendingRenewals"
       status="Pending"
-      daysAhead={30}
+      policyBucket="renewal"
     />
   );
 }

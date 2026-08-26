@@ -18,6 +18,7 @@ export default function NewPolicyPage() {
   const [documentFile, setDocumentFile] = useState(null);
   const [form, setForm] = useState({
     client_name: '',
+    policy_bucket: 'fresh',
     policy_type: HEALTH_POLICY_TYPE,
     insurance_company: '',
     other_company: '',
@@ -104,7 +105,7 @@ export default function NewPolicyPage() {
       }
 
       toast.success(uploadedDocument ? 'Policy and e-policy PDF created successfully.' : 'Policy created successfully.');
-      router.push('/policies');
+      router.push(payload.policy_bucket === 'fresh' ? '/fresh-policies' : '/policies');
     } catch (err) {
       const message = err.message || 'Failed to create policy';
       setError(message);
@@ -135,6 +136,14 @@ export default function NewPolicyPage() {
               required
               placeholder="Enter client full name"
             />
+          </div>
+
+          <div className={styles.field}>
+            <label>Policy Section</label>
+            <select name="policy_bucket" value={form.policy_bucket} onChange={handleChange}>
+              <option value="fresh">Fresh Policy</option>
+              <option value="renewal">Policy to be Renewed</option>
+            </select>
           </div>
 
           <div className={styles.field}>

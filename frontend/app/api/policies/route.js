@@ -17,8 +17,13 @@ export async function GET(request) {
     const search = searchParams.get('search') || '';
     const company = searchParams.get('company') || '';
     const status = searchParams.get('status') || '';
+    const policy_bucket = searchParams.get('policy_bucket') || '';
     const due_date_from = searchParams.get('due_date_from') || '';
     const due_date_to = searchParams.get('due_date_to') || '';
+    const issuance_date_from = searchParams.get('issuance_date_from') || '';
+    const issuance_date_to = searchParams.get('issuance_date_to') || '';
+    const created_at_from = searchParams.get('created_at_from') || '';
+    const created_at_to = searchParams.get('created_at_to') || '';
     const sort_by = searchParams.get('sort_by') || 'due_date';
     const sort_order = searchParams.get('sort_order') || 'asc';
 
@@ -43,6 +48,10 @@ export async function GET(request) {
       queryBuilder = queryBuilder.eq('status', status);
     }
 
+    if (policy_bucket) {
+      queryBuilder = queryBuilder.eq('policy_bucket', policy_bucket);
+    }
+
     if (due_date_from) {
       queryBuilder = queryBuilder.gte('due_date', due_date_from);
     }
@@ -51,7 +60,23 @@ export async function GET(request) {
       queryBuilder = queryBuilder.lte('due_date', due_date_to);
     }
 
-    const sortColumn = ['due_date', 'payment_due_date', 'client_name', 'premium_amount', 'created_at'].includes(sort_by)
+    if (issuance_date_from) {
+      queryBuilder = queryBuilder.gte('issuance_date', issuance_date_from);
+    }
+
+    if (issuance_date_to) {
+      queryBuilder = queryBuilder.lte('issuance_date', issuance_date_to);
+    }
+
+    if (created_at_from) {
+      queryBuilder = queryBuilder.gte('created_at', `${created_at_from}T00:00:00`);
+    }
+
+    if (created_at_to) {
+      queryBuilder = queryBuilder.lte('created_at', `${created_at_to}T23:59:59`);
+    }
+
+    const sortColumn = ['due_date', 'payment_due_date', 'issuance_date', 'client_name', 'premium_amount', 'created_at'].includes(sort_by)
       ? sort_by
       : 'due_date';
     const ascending = sort_order === 'asc';

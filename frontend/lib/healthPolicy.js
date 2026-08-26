@@ -15,7 +15,7 @@ export const POLICY_TYPES = [
   }
 ];
 export const HEALTH_INSURANCE_COMPANIES = [
-  'Manipal Signa',
+  'Manipal Cigna',
   'HDFC Ergo',
   'Niva Bupa',
   'TATA',

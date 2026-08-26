@@ -45,6 +45,7 @@ export default function LoginPage() {
       <div className={styles.authCard}>
         <div className={styles.logoWrapper}>
           <Image src="/logo.png" alt="Insured Renewal Portal" width={180} height={90} className={styles.logo} priority />
+          <span className={styles.logoDisclosure}>AMFI-registered Mutual Funds Distributor</span>
         </div>
 
         <h2>Welcome Back</h2>

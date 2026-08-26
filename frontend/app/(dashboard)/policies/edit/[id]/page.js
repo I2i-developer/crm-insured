@@ -21,6 +21,7 @@ export default function EditPolicyPage() {
   const [currentDocument, setCurrentDocument] = useState({ name: '', url: '' });
   const [form, setForm] = useState({
     client_name: '',
+    policy_bucket: 'renewal',
     policy_type: HEALTH_POLICY_TYPE,
     insurance_company: '',
     other_company: '',
@@ -51,6 +52,7 @@ export default function EditPolicyPage() {
       const knownCompany = HEALTH_INSURANCE_COMPANIES.includes(policy.insurance_company);
       setForm({
         client_name: policy.client_name,
+        policy_bucket: policy.policy_bucket || 'renewal',
         policy_type: policy.policy_type || HEALTH_POLICY_TYPE,
         insurance_company: knownCompany ? policy.insurance_company : OTHER_COMPANY,
         other_company: knownCompany ? '' : policy.insurance_company,
@@ -148,7 +150,7 @@ export default function EditPolicyPage() {
       }
 
       toast.success(uploadedDocument ? 'Policy and e-policy PDF updated successfully.' : 'Policy updated successfully.');
-      router.push('/policies');
+      router.push(payload.policy_bucket === 'fresh' ? '/fresh-policies' : '/policies');
     } catch (err) {
       const message = err.message || 'Failed to update policy';
       setError(message);
@@ -188,6 +190,14 @@ export default function EditPolicyPage() {
               onChange={handleChange}
               required
             />
+          </div>
+
+          <div className={styles.field}>
+            <label>Policy Section</label>
+            <select name="policy_bucket" value={form.policy_bucket} onChange={handleChange}>
+              <option value="fresh">Fresh Policy</option>
+              <option value="renewal">Policy to be Renewed</option>
+            </select>
           </div>
 
           <div className={styles.field}>

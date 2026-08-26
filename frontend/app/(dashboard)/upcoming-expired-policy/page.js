@@ -6,6 +6,7 @@ export default function UpcomingExpiredPolicyPage() {
       title="Upcoming Expired Policy"
       description="Policies approaching expiry so agents can schedule renewal conversations before coverage lapses."
       mode="upcomingExpiry"
+      policyBucket="renewal"
       daysAhead={30}
     />
   );

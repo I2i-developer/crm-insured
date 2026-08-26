@@ -59,6 +59,10 @@ function statusClass(status) {
   return styles[`status${String(status || '').replace(/\s+/g, '')}`] || '';
 }
 
+function formatPolicyBucket(value) {
+  return value === 'fresh' ? 'Fresh Policy' : 'Policy to be Renewed';
+}
+
 export default function PolicyDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
@@ -172,6 +176,7 @@ export default function PolicyDetailsPage() {
       title: 'Policy Information',
       items: [
         ['Policy Number', policy.policy_number],
+        ['Policy Section', formatPolicyBucket(policy.policy_bucket)],
         ['Policy Type', policy.policy_type || 'Health Insurance'],
         ['Plan Name', policy.plan_name || '-'],
         ['Insurance Company', policy.insurance_company],
@@ -214,7 +219,7 @@ export default function PolicyDetailsPage() {
           <p>{policy.policy_number} - {policy.insurance_company}</p>
         </div>
         <div className={styles.headerActions}>
-          <Link href="/policies" className={styles.secondaryBtn}>Back</Link>
+          <Link href={policy.policy_bucket === 'fresh' ? '/fresh-policies' : '/policies'} className={styles.secondaryBtn}>Back</Link>
           <Link href={`/policies/edit/${policy.id}`} className={styles.primaryBtn}>Edit Policy</Link>
         </div>
       </header>

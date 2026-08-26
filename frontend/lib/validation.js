@@ -1,16 +1,25 @@
 export const POLICY_STATUSES = ['Paid', 'Pending', 'Overdue', 'Grace Period', 'Lapsed', 'Renew Done'];
 export const POLICY_TYPES = ['Health Insurance', 'Motor Insurance', 'Travel Insurance'];
+export const POLICY_BUCKETS = ['fresh', 'renewal'];
 export const POLICY_RENEWAL_YEARS = [1, 2, 3];
 export const POLICY_DISCOUNT_TYPES = ['NRI discount', 'Family discount'];
 export const ALERT_CHANNELS = ['email', 'sms', 'whatsapp'];
 export const ALERT_TYPES = ['reminder', 'overdue', 'custom'];
 export const DEFAULT_POLICY_TYPE = 'Health Insurance';
+export const FRESH_POLICY_START_DATE = '2026-07-13';
 export const LEAD_STAGES = ['New', 'Contacted', 'Qualified', 'Proposal', 'Converted', 'Lost'];
 export const LEAD_PRIORITIES = ['Low', 'Medium', 'High'];
 
+function getDefaultPolicyBucket() {
+  return new Date() > new Date(`${FRESH_POLICY_START_DATE}T23:59:59`) ? 'fresh' : 'renewal';
+}
+
 function normalizeInsuranceCompany(value) {
   const company = cleanString(value, 160);
-  return company.toLowerCase() === 'hdfc' ? 'HDFC Ergo' : company;
+  const normalized = company.toLowerCase();
+  if (normalized === 'hdfc') return 'HDFC Ergo';
+  if (normalized === 'manipal signa' || normalized === 'manipal cigna') return 'Manipal Cigna';
+  return company;
 }
 
 export function cleanString(value, maxLength = 500) {
@@ -77,6 +86,13 @@ export function validatePolicyInput(input, { partial = false } = {}) {
     const policyType = cleanString(input.policy_type, 120) || DEFAULT_POLICY_TYPE;
     if (!POLICY_TYPES.includes(policyType)) errors.push('policy_type is invalid');
     else policy.policy_type = policyType;
+  }
+  if (input.policy_bucket !== undefined) {
+    const policyBucket = cleanString(input.policy_bucket, 40).toLowerCase() || getDefaultPolicyBucket();
+    if (!POLICY_BUCKETS.includes(policyBucket)) errors.push('policy_bucket is invalid');
+    else policy.policy_bucket = policyBucket;
+  } else if (!partial) {
+    policy.policy_bucket = getDefaultPolicyBucket();
   }
   if (input.insurance_company !== undefined) policy.insurance_company = normalizeInsuranceCompany(input.insurance_company);
   if (input.policy_number !== undefined) policy.policy_number = cleanString(String(input.policy_number), 80);

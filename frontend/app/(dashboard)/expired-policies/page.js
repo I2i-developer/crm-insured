@@ -6,6 +6,7 @@ export default function ExpiredPoliciesPage() {
       title="Expired Policy Details"
       description="Policies with past due dates that still need renewal, recovery, or closure follow-up."
       mode="expired"
+      policyBucket="renewal"
     />
   );
 }

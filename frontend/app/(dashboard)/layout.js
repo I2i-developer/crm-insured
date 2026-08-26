@@ -333,7 +333,8 @@ export default function DashboardLayout({ children }) {
   const isAdmin = user?.role === 'admin';
   const commandItems = [
     { label: 'Dashboard', description: 'Executive health policy summary', href: '/dashboard', keywords: 'home overview graphs executive' },
-    { label: 'Policies', description: 'Search and manage health policies', href: '/policies', keywords: 'policy all records portfolio' },
+    { label: 'Policies to be Renewed', description: 'Existing policies due for renewal follow-up', href: '/policies', keywords: 'policy renewal records portfolio renewed' },
+    { label: 'Fresh Policies', description: 'New business policies with month and year filters', href: '/fresh-policies', keywords: 'fresh policy new business month year issued issuance' },
     { label: 'Add Policy', description: 'Create a new health policy', href: '/policies/new', keywords: 'new create add policy' },
     { label: 'Import Policies', description: 'Bulk upload CSV or XLSX policies', href: '/policies/import', keywords: 'upload bulk import excel csv' },
     { label: 'Lead Management', description: 'Manage incoming health policy leads', href: '/leads', keywords: 'lead leads pipeline follow up remark' },
@@ -395,6 +396,7 @@ export default function DashboardLayout({ children }) {
       <aside className={styles.sidebar}>
         <Link href="/dashboard" className={styles.logoSection} aria-label="Insured dashboard">
           <Image src="/logo.png" alt="Insured" width={90} height={70} className={styles.logoImg} priority />
+          <span className={styles.logoDisclosure}>AMFI-registered Mutual Funds Distributor</span>
         </Link>
 
         <nav className={styles.nav}>
@@ -403,9 +405,13 @@ export default function DashboardLayout({ children }) {
             <span className={styles.navIcon}><DashboardIcon /></span>
             Dashboard
           </Link>
-          <Link href="/policies" className={`${styles.navItem} ${pathname === '/policies' || pathname.startsWith('/policies/') ? styles.active : ''}`}>
+          <Link href="/policies" className={`${styles.navItem} ${pathname === '/policies' ? styles.active : ''}`}>
             <span className={styles.navIcon}><PolicyIcon /></span>
-            Policies
+            Policies to be Renewed
+          </Link>
+          <Link href="/fresh-policies" className={`${styles.navItem} ${pathname === '/fresh-policies' ? styles.active : ''}`}>
+            <span className={styles.navIcon}><PolicyIcon /></span>
+            Fresh Policies
           </Link>
           <Link href="/all-policy" className={`${styles.navItem} ${pathname === '/all-policy' ? styles.active : ''}`}>
             <span className={styles.navIcon}><PolicyIcon /></span>

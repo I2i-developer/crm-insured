@@ -9,7 +9,12 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { searchParams } = new URL(request.url);
+    const policyBucket = searchParams.get('policy_bucket') || '';
     const supabaseAdmin = getSupabaseAdmin();
+    const currentYear = new Date().getFullYear();
+    const currentYearStart = `${currentYear}-01-01`;
+    const currentYearEnd = `${currentYear}-12-31`;
     const baseCount = () => {
       let query = supabaseAdmin
         .from('policies')
@@ -19,12 +24,18 @@ export async function GET(request) {
         query = query.eq('user_id', auth.userId);
       }
 
+      if (policyBucket) {
+        query = query.eq('policy_bucket', policyBucket);
+      }
+
       return query;
     };
 
     const { count: totalCount } = await baseCount();
     const { count: pendingCount } = await baseCount()
-      .eq('status', 'Pending');
+      .eq('status', 'Pending')
+      .gte('due_date', currentYearStart)
+      .lte('due_date', currentYearEnd);
 
     const { count: paidCount } = await baseCount()
       .eq('status', 'Paid');

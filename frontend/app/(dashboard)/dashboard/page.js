@@ -42,6 +42,13 @@ function isInDateRange(policy, dateFrom, dateTo) {
   return true;
 }
 
+function isDueInCurrentCalendarYear(policy) {
+  const due = new Date(policy.due_date);
+  if (Number.isNaN(due.getTime())) return false;
+  const year = new Date().getFullYear();
+  return due.getFullYear() === year;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const toast = useToast();
@@ -112,6 +119,7 @@ export default function DashboardPage() {
     const overdueValue = filteredPolicies
       .filter(policy => !CLOSED_STATUSES.includes(policy.status) && policy.status !== 'Lapsed' && (policy.status === 'Overdue' || new Date(policy.due_date) < today))
       .reduce((sum, policy) => sum + Number(policy.premium_amount || 0), 0);
+    const pendingRenewalCount = filteredPolicies.filter(policy => (policy.policy_bucket || 'renewal') === 'renewal' && policy.status === 'Pending' && isDueInCurrentCalendarYear(policy)).length;
 
     const filteredCounts = filteredPolicies.reduce((counts, policy) => {
       counts.total += 1;
@@ -128,6 +136,7 @@ export default function DashboardPage() {
       paidPremium,
       dueInSeven,
       overdueValue,
+      pendingRenewalCount,
       paidRate,
       riskCount,
       activeCount,
@@ -288,7 +297,7 @@ export default function DashboardPage() {
           tone="primary"
         />
         <MetricCard icon={<PolicyPaidIcon />} label="Paid Premium" value={loading ? '-' : formatCurrency(metrics.paidPremium)} hint={`${metrics.paidRate}% collected in range`} tone="success" />
-        <MetricCard icon={<PolicyPendingIcon />} label="Pending Renewals" value={loading ? '-' : (metrics.counts?.Pending || 0)} hint={`${metrics.dueInSeven} due in 7 days`} tone="warning" href="/upcoming-renewals" />
+        <MetricCard icon={<PolicyPendingIcon />} label="Pending Renewals" value={loading ? '-' : metrics.pendingRenewalCount} hint="Due from 1 Jan to 31 Dec this year" tone="warning" href="/upcoming-renewals" />
         <MetricCard icon={<PolicyOverdueIcon />} label="Risk Queue" value={loading ? '-' : metrics.riskCount} hint={formatCurrency(metrics.overdueValue)} tone="danger" href="/expired-policies" />
       </div>
 
