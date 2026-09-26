@@ -11,6 +11,7 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const policyBucket = searchParams.get('policy_bucket') || '';
+    const excludeStatus = searchParams.get('exclude_status') || '';
     const supabaseAdmin = getSupabaseAdmin();
     const currentYear = new Date().getFullYear();
     const currentYearStart = `${currentYear}-01-01`;
@@ -26,6 +27,15 @@ export async function GET(request) {
 
       if (policyBucket) {
         query = query.eq('policy_bucket', policyBucket);
+      }
+
+      if (excludeStatus) {
+        const excludedStatuses = excludeStatus.split(',').map(item => item.trim()).filter(Boolean);
+        if (excludedStatuses.length === 1) {
+          query = query.neq('status', excludedStatuses[0]);
+        } else if (excludedStatuses.length > 1) {
+          query = query.not('status', 'in', `(${excludedStatuses.map(item => `"${item}"`).join(',')})`);
+        }
       }
 
       return query;

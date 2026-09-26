@@ -17,6 +17,7 @@ export async function GET(request) {
     const search = searchParams.get('search') || '';
     const company = searchParams.get('company') || '';
     const status = searchParams.get('status') || '';
+    const exclude_status = searchParams.get('exclude_status') || '';
     const policy_bucket = searchParams.get('policy_bucket') || '';
     const due_date_from = searchParams.get('due_date_from') || '';
     const due_date_to = searchParams.get('due_date_to') || '';
@@ -46,6 +47,15 @@ export async function GET(request) {
 
     if (status) {
       queryBuilder = queryBuilder.eq('status', status);
+    }
+
+    if (exclude_status) {
+      const excludedStatuses = exclude_status.split(',').map(item => item.trim()).filter(Boolean);
+      if (excludedStatuses.length === 1) {
+        queryBuilder = queryBuilder.neq('status', excludedStatuses[0]);
+      } else if (excludedStatuses.length > 1) {
+        queryBuilder = queryBuilder.not('status', 'in', `(${excludedStatuses.map(item => `"${item}"`).join(',')})`);
+      }
     }
 
     if (policy_bucket) {

@@ -340,6 +340,7 @@ export default function DashboardLayout({ children }) {
     { label: 'Lead Management', description: 'Manage incoming health policy leads', href: '/leads', keywords: 'lead leads pipeline follow up remark' },
     { label: 'Clients', description: 'Client portfolio and contact records', href: '/clients', keywords: 'customer client contact' },
     { label: 'Upcoming Renewals', description: 'Renewal follow-up queue', href: '/upcoming-renewals', keywords: 'renewal renew expiring upcoming' },
+    { label: 'Renew Done', description: 'Completed renewal policies', href: '/renew-done-policies', keywords: 'renew done completed renewal policies' },
     { label: 'Expired Policies', description: 'Expired and overdue coverage', href: '/expired-policies', keywords: 'expired overdue lapse' },
     { label: 'Payment Due', description: 'Premium payment follow-ups', href: '/payment-due-policy', keywords: 'payment premium due collection' },
     { label: 'Interactions', description: 'Policy communication logs', href: '/interactions', keywords: 'logs remarks communication interaction' },
@@ -450,6 +451,10 @@ export default function DashboardLayout({ children }) {
           <Link href="/upcoming-renewals" className={`${styles.navItem} ${pathname === '/upcoming-renewals' ? styles.active : ''}`}>
             <span className={styles.navIcon}><CalendarIcon /></span>
             Upcoming Renewals
+          </Link>
+          <Link href="/renew-done-policies" className={`${styles.navItem} ${pathname === '/renew-done-policies' ? styles.active : ''}`}>
+            <span className={styles.navIcon}><PolicyIcon /></span>
+            Renew Done
           </Link>
           <Link href="/expired-policies" className={`${styles.navItem} ${pathname === '/expired-policies' ? styles.active : ''}`}>
             <span className={styles.navIcon}><ClockIcon /></span>

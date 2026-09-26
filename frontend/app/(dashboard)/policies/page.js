@@ -10,6 +10,7 @@ import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const RENEW_DONE_STATUS = 'Renew Done';
 
 function isValidPolicyId(id) {
   return typeof id === 'string' && UUID_PATTERN.test(id);
@@ -20,6 +21,16 @@ function getClientInitial(name) {
     .replace(/^\s*(mr|mrs|ms|miss|dr|shri|smt)\.?\s+/i, '')
     .trim();
   return (cleaned.charAt(0) || 'C').toUpperCase();
+}
+
+function getCompanyClassName(company) {
+  const normalized = String(company || '').trim().toLowerCase();
+  if (normalized.includes('manipal cigna')) return styles.companyManipal;
+  if (normalized.includes('hdfc')) return styles.companyHdfc;
+  if (normalized.includes('niva bupa')) return styles.companyNiva;
+  if (normalized.includes('tata')) return styles.companyTata;
+  if (normalized.includes('other')) return styles.companyOther;
+  return styles.companyDefault;
 }
 
 export default function PoliciesPage() {
@@ -36,6 +47,7 @@ export default function PoliciesPage() {
     company: searchParams.get('company') || '',
     status: searchParams.get('filter') || '',
     policy_bucket: 'renewal',
+    exclude_status: RENEW_DONE_STATUS,
     due_date_from: '',
     due_date_to: ''
   });
@@ -51,7 +63,7 @@ export default function PoliciesPage() {
 
   const fetchStats = async () => {
     try {
-      const data = await api.get('/policies/stats?policy_bucket=renewal');
+      const data = await api.get(`/policies/stats?policy_bucket=renewal&exclude_status=${encodeURIComponent(RENEW_DONE_STATUS)}`);
       setStats(data.stats);
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -198,7 +210,7 @@ export default function PoliciesPage() {
           </select>
           <select value={filters.status} onChange={(e) => handleFilterChange('status', e.target.value)} className={styles.select}>
             <option value="">All Statuses</option>
-            {POLICY_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+            {POLICY_STATUSES.filter(status => status !== RENEW_DONE_STATUS).map(status => <option key={status} value={status}>{status}</option>)}
           </select>
           <input
             type="date"
@@ -253,7 +265,11 @@ export default function PoliciesPage() {
                       </td>
                       <td className={styles.policyNumber}>{policy.policy_number}</td>
                       <td>{policy.policy_type || HEALTH_POLICY_TYPE}</td>
-                      <td>{policy.insurance_company}</td>
+                      <td>
+                        <span className={`${styles.companyBadge} ${getCompanyClassName(policy.insurance_company)}`}>
+                          {policy.insurance_company}
+                        </span>
+                      </td>
                       <td>
                         <span className={days <= 7 ? styles.urgent : days <= 30 ? styles.soon : ''}>
                           {formatDate(policy.due_date)}

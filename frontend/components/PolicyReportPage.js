@@ -121,6 +121,16 @@ function formatPolicyBucket(value) {
   return value === 'fresh' ? 'Fresh Policy' : 'Policy to be Renewed';
 }
 
+function getCompanyClassName(company) {
+  const normalized = String(company || '').trim().toLowerCase();
+  if (normalized.includes('manipal cigna')) return styles.companyManipal;
+  if (normalized.includes('hdfc')) return styles.companyHdfc;
+  if (normalized.includes('niva bupa')) return styles.companyNiva;
+  if (normalized.includes('tata')) return styles.companyTata;
+  if (normalized.includes('other')) return styles.companyOther;
+  return styles.companyDefault;
+}
+
 export default function PolicyReportPage({
   title,
   description,
@@ -552,7 +562,11 @@ export default function PolicyReportPage({
                     </div>
                   </td>
                   <td className={styles.muted}>{policy.policy_number}</td>
-                  <td>{policy.insurance_company}</td>
+                  <td>
+                    <span className={`${styles.companyBadge} ${getCompanyClassName(policy.insurance_company)}`}>
+                      {policy.insurance_company}
+                    </span>
+                  </td>
                   <td>{formatPolicyBucket(policy.policy_bucket)}</td>
                   <td>{policy.policy_type || HEALTH_POLICY_TYPE}</td>
                   <td>{formatDate(isFreshPolicies ? policy.created_at : mode === 'paymentDue' || mode === 'upcomingPayment' ? getPolicyPaymentDate(policy) : policy.due_date)}</td>
