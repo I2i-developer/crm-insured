@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { writeAuditLog } from '@/lib/audit';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { applyUserAccessScope, getUserAccessFromRequest } from '@/lib/server-auth';
+import { applyUserAccessScope, getAccessibleUserIds, getUserAccessFromRequest } from '@/lib/server-auth';
 import { cleanString } from '@/lib/validation';
 
 export async function GET(request) {
@@ -17,9 +17,21 @@ export async function GET(request) {
     const supabaseAdmin = getSupabaseAdmin();
     let queryBuilder = supabaseAdmin
       .from('interaction_logs')
-      .select('*, policies!inner(user_id)');
+      .select('*');
 
-    ({ query: queryBuilder } = await applyUserAccessScope(queryBuilder, auth, 'policies.user_id', supabaseAdmin));
+    const accessibleUserIds = await getAccessibleUserIds(auth, supabaseAdmin);
+    if (accessibleUserIds) {
+      const inList = `(${accessibleUserIds.join(',')})`;
+      const { data: accessiblePolicies, error: policyAccessError } = await supabaseAdmin
+        .from('policies')
+        .select('id')
+        .or(`user_id.in.${inList},assigned_to.in.${inList}`);
+
+      if (policyAccessError) return NextResponse.json({ error: policyAccessError.message }, { status: 400 });
+      const policyIds = (accessiblePolicies || []).map(policy => policy.id);
+      if (policyIds.length === 0) return NextResponse.json({ logs: [] });
+      queryBuilder = queryBuilder.in('policy_id', policyIds);
+    }
 
     if (policyId) {
       queryBuilder = queryBuilder.eq('policy_id', policyId);
@@ -60,7 +72,7 @@ export async function POST(request) {
       .select('id')
       .eq('id', policy_id);
 
-    ({ query: policyQuery } = await applyUserAccessScope(policyQuery, auth, 'user_id', supabaseAdmin));
+    ({ query: policyQuery } = await applyUserAccessScope(policyQuery, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data: policy } = await policyQuery.single();
 

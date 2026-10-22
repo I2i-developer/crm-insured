@@ -11,6 +11,7 @@ function toPublicUser(user) {
     name: user.name,
     role: user.role || 'team_member',
     reports_to: user.reports_to || '',
+    portfolio_access_scope: user.portfolio_access_scope || 'team',
     avatar_url: user.avatar_url || '',
     designation: user.designation || ''
   };

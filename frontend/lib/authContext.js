@@ -61,6 +61,7 @@ export const AuthProvider = ({ children }) => {
       name: data.user.name,
       role: data.user.role || 'team_member',
       reports_to: data.user.reports_to || '',
+      portfolio_access_scope: data.user.portfolio_access_scope || 'team',
       avatar_url: data.user.avatar_url || '',
       designation: data.user.designation || ''
     };
@@ -87,6 +88,7 @@ export const AuthProvider = ({ children }) => {
       name: data.user.name,
       role: data.user.role || 'team_member',
       reports_to: data.user.reports_to || '',
+      portfolio_access_scope: data.user.portfolio_access_scope || 'team',
       avatar_url: data.user.avatar_url || '',
       designation: data.user.designation || ''
     };

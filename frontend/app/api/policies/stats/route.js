@@ -22,7 +22,10 @@ export async function GET(request) {
         .from('policies')
         .select('id', { count: 'exact', head: true });
 
-      if (accessibleUserIds) query = query.in('user_id', accessibleUserIds);
+      if (accessibleUserIds) {
+        const inList = `(${accessibleUserIds.join(',')})`;
+        query = query.or(`user_id.in.${inList},assigned_to.in.${inList}`);
+      }
 
       if (policyBucket) {
         query = query.eq('policy_bucket', policyBucket);

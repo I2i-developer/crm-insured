@@ -80,7 +80,7 @@ export async function getUserAccessFromRequest(request) {
     const supabaseAdmin = getSupabaseAdmin();
     const { data: user } = await supabaseAdmin
       .from('users')
-      .select('id, email, name, role, reports_to')
+      .select('id, email, name, role, reports_to, portfolio_access_scope')
       .eq('id', auth.userId)
       .single();
 
@@ -91,7 +91,8 @@ export async function getUserAccessFromRequest(request) {
       email: user.email || auth.email,
       name: user.name || null,
       role: normalizeRole(user.role),
-      reportsTo: user.reports_to || null
+      reportsTo: user.reports_to || null,
+      portfolioAccessScope: user.portfolio_access_scope || 'team'
     };
   } catch {
     return auth;
@@ -101,6 +102,7 @@ export async function getUserAccessFromRequest(request) {
 export async function getAccessibleUserIds(auth, supabaseAdmin = getSupabaseAdmin()) {
   if (!auth || isPrivilegedRole(auth.role)) return null;
   if (!isTeamHeadRole(auth.role)) return [auth.userId];
+  if (auth.portfolioAccessScope === 'organization') return null;
 
   const { data, error } = await supabaseAdmin
     .from('users')

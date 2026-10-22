@@ -33,7 +33,7 @@ export async function GET(request) {
       .from('policies')
       .select('*', { count: 'exact' });
 
-    ({ query: queryBuilder } = await applyUserAccessScope(queryBuilder, auth, 'user_id', supabaseAdmin));
+    ({ query: queryBuilder } = await applyUserAccessScope(queryBuilder, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     if (search) {
       queryBuilder = queryBuilder.ilike('client_name', `%${search}%`);

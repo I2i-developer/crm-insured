@@ -80,7 +80,7 @@ export async function POST(request) {
       .from('users')
       .update({ avatar_url: avatarUrl })
       .eq('id', auth.userId)
-      .select('id, email, name, role, avatar_url, designation, reports_to')
+      .select('id, email, name, role, avatar_url, designation, reports_to, portfolio_access_scope')
       .single();
 
     if (updateError || !user) {

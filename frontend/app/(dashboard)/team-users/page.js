@@ -12,7 +12,8 @@ const emptyForm = {
   password: '',
   role: 'team_member',
   designation: '',
-  reports_to: ''
+  reports_to: '',
+  portfolio_access_scope: 'team'
 };
 
 const roleLabels = {
@@ -94,7 +95,7 @@ export default function TeamUsersPage() {
     setForm(current => ({
       ...current,
       [name]: value,
-      ...(name === 'role' ? { reports_to: '' } : {})
+      ...(name === 'role' ? { reports_to: '', portfolio_access_scope: 'team' } : {})
     }));
   };
 
@@ -106,7 +107,8 @@ export default function TeamUsersPage() {
       password: '',
       role: user.role,
       designation: user.designation || '',
-      reports_to: user.reports_to || ''
+      reports_to: user.reports_to || '',
+      portfolio_access_scope: user.portfolio_access_scope || 'team'
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -201,6 +203,17 @@ export default function TeamUsersPage() {
             </label>
           )}
 
+          {form.role === 'team_head' && (
+            <label>
+              Portfolio access
+              <select name="portfolio_access_scope" value={form.portfolio_access_scope} onChange={handleChange}>
+                <option value="team">Own and team portfolio</option>
+                <option value="organization">Entire organization portfolio</option>
+              </select>
+              <small className={styles.fieldHint}>Organization access shows all CRM policies without changing their ownership.</small>
+            </label>
+          )}
+
           <label>
             Designation
             <input name="designation" value={form.designation} onChange={handleChange} placeholder="Team Head, Sales Agent" />
@@ -225,6 +238,7 @@ export default function TeamUsersPage() {
                   <th>Role</th>
                   <th>Designation</th>
                   <th>Reports To</th>
+                  <th>Portfolio Access</th>
                   <th>Created</th>
                   <th>Actions</th>
                 </tr>
@@ -244,6 +258,7 @@ export default function TeamUsersPage() {
                     <td><span className={styles.rolePill}>{roleLabels[user.role] || user.role}</span></td>
                     <td>{user.designation || '-'}</td>
                     <td>{user.role === 'team_head' ? 'All Admins' : user.manager_name || (user.role === 'team_member' ? 'Unassigned' : '-')}</td>
+                    <td>{user.role === 'team_head' ? (user.portfolio_access_scope === 'organization' ? 'Entire Organization' : 'Own and Team') : '-'}</td>
                     <td>{new Date(user.created_at).toLocaleDateString('en-IN')}</td>
                     <td>
                       {user.role !== 'super_admin' && (

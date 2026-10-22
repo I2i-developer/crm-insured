@@ -45,6 +45,7 @@ function publicUser(user, managerMap = new Map()) {
     reports_to: user.reports_to || '',
     manager_name: managerMap.get(user.reports_to)?.name || '',
     manager_role: managerMap.get(user.reports_to)?.role || '',
+    portfolio_access_scope: user.portfolio_access_scope || 'team',
     created_at: user.created_at,
     updated_at: user.updated_at
   };
@@ -81,7 +82,7 @@ export async function GET(request) {
     const supabaseAdmin = getSupabaseAdmin();
     const { data, error } = await supabaseAdmin
       .from('users')
-      .select('id, email, name, role, designation, avatar_url, reports_to, created_at, updated_at')
+      .select('id, email, name, role, designation, avatar_url, reports_to, portfolio_access_scope, created_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -107,6 +108,9 @@ export async function POST(request) {
     const role = CREATABLE_ROLES.includes(input.role) ? input.role : '';
     const designation = cleanString(input.designation, 120);
     const reportsTo = cleanString(input.reports_to, 80);
+    const portfolioAccessScope = role === USER_ROLES.TEAM_HEAD && input.portfolio_access_scope === 'organization'
+      ? 'organization'
+      : 'team';
 
     if (!name || !email || !password || !role) {
       return NextResponse.json({ error: 'Name, email, password and role are required' }, { status: 400 });
@@ -143,10 +147,11 @@ export async function POST(request) {
         name,
         role,
         reports_to: reporting.reportsTo,
+        portfolio_access_scope: portfolioAccessScope,
         designation: designation || null,
         password_hash: hashPassword(password)
       })
-      .select('id, email, name, role, designation, avatar_url, reports_to, created_at, updated_at')
+      .select('id, email, name, role, designation, avatar_url, reports_to, portfolio_access_scope, created_at, updated_at')
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -156,7 +161,12 @@ export async function POST(request) {
       entityType: 'user',
       entityId: user.id,
       summary: `Created ${role} user ${email}`,
-      metadata: { created_user_email: email, created_user_role: role, reports_to: reporting.reportsTo }
+      metadata: {
+        created_user_email: email,
+        created_user_role: role,
+        reports_to: reporting.reportsTo,
+        portfolio_access_scope: portfolioAccessScope
+      }
     });
 
     return NextResponse.json({ message: 'User created successfully', user: publicUser(user) }, { status: 201 });
@@ -179,6 +189,9 @@ export async function PUT(request) {
     const role = CREATABLE_ROLES.includes(input.role) ? input.role : '';
     const designation = cleanString(input.designation, 120);
     const reportsTo = cleanString(input.reports_to, 80);
+    const portfolioAccessScope = role === USER_ROLES.TEAM_HEAD && input.portfolio_access_scope === 'organization'
+      ? 'organization'
+      : 'team';
     const password = typeof input.password === 'string' ? input.password : '';
 
     if (!userId || !name || !email || !role) {
@@ -220,7 +233,8 @@ export async function PUT(request) {
       email,
       role,
       designation: designation || null,
-      reports_to: reporting.reportsTo
+      reports_to: reporting.reportsTo,
+      portfolio_access_scope: portfolioAccessScope
     };
     if (password) updates.password_hash = hashPassword(password);
 
@@ -228,7 +242,7 @@ export async function PUT(request) {
       .from('users')
       .update(updates)
       .eq('id', userId)
-      .select('id, email, name, role, designation, avatar_url, reports_to, created_at, updated_at')
+      .select('id, email, name, role, designation, avatar_url, reports_to, portfolio_access_scope, created_at, updated_at')
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
@@ -238,7 +252,12 @@ export async function PUT(request) {
       entityType: 'user',
       entityId: user.id,
       summary: `Updated ${role} user ${email}`,
-      metadata: { previous_role: currentUser.role, updated_role: role, reports_to: reporting.reportsTo }
+      metadata: {
+        previous_role: currentUser.role,
+        updated_role: role,
+        reports_to: reporting.reportsTo,
+        portfolio_access_scope: portfolioAccessScope
+      }
     });
 
     return NextResponse.json({ message: 'User updated successfully', user: publicUser(user) });

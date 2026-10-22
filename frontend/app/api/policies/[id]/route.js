@@ -64,7 +64,7 @@ export async function GET(request, { params }) {
       .select('*')
       .eq('id', id);
 
-    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin));
+    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data, error } = await query.single();
 
@@ -102,7 +102,7 @@ export async function PUT(request, { params }) {
       .select('*')
       .eq('id', id);
 
-    ({ query: currentQuery } = await applyUserAccessScope(currentQuery, auth, 'user_id', supabaseAdmin));
+    ({ query: currentQuery } = await applyUserAccessScope(currentQuery, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data: currentPolicy, error: currentError } = await currentQuery.single();
 
@@ -131,7 +131,7 @@ export async function PUT(request, { params }) {
       .update(updates)
       .eq('id', id);
 
-    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin));
+    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data, error } = await query.select().single();
 
@@ -172,7 +172,7 @@ export async function DELETE(request, { params }) {
       .delete()
       .eq('id', id);
 
-    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin));
+    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data, error } = await query.select('id, policy_number, client_name').single();
 

@@ -68,7 +68,7 @@ export async function POST(request, { params }) {
       .select('id, user_id, policy_number, client_name')
       .eq('id', id);
 
-    ({ query: policyQuery } = await applyUserAccessScope(policyQuery, auth, 'user_id', supabaseAdmin));
+    ({ query: policyQuery } = await applyUserAccessScope(policyQuery, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data: policy, error: policyError } = await policyQuery.single();
     if (policyError || !policy) {
