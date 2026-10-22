@@ -6,6 +6,7 @@ const PASSWORD_HASH_PREFIX = 'scrypt';
 export const USER_ROLES = {
   SUPER_ADMIN: 'super_admin',
   ADMIN: 'admin',
+  TEAM_HEAD: 'team_head',
   TEAM_MEMBER: 'team_member'
 };
 
@@ -14,6 +15,18 @@ export function normalizeRole(role) {
 }
 
 export function isPrivilegedRole(role) {
+  return [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN].includes(normalizeRole(role));
+}
+
+export function isTeamHeadRole(role) {
+  return normalizeRole(role) === USER_ROLES.TEAM_HEAD;
+}
+
+export function canSubmitEodReport(role) {
+  return [USER_ROLES.TEAM_HEAD, USER_ROLES.TEAM_MEMBER].includes(normalizeRole(role));
+}
+
+export function canReviewEodReports(role) {
   return [USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN].includes(normalizeRole(role));
 }
 
@@ -67,7 +80,7 @@ export async function getUserAccessFromRequest(request) {
     const supabaseAdmin = getSupabaseAdmin();
     const { data: user } = await supabaseAdmin
       .from('users')
-      .select('id, email, role')
+      .select('id, email, name, role, reports_to')
       .eq('id', auth.userId)
       .single();
 
@@ -76,11 +89,37 @@ export async function getUserAccessFromRequest(request) {
     return {
       ...auth,
       email: user.email || auth.email,
-      role: normalizeRole(user.role)
+      name: user.name || null,
+      role: normalizeRole(user.role),
+      reportsTo: user.reports_to || null
     };
   } catch {
     return auth;
   }
+}
+
+export async function getAccessibleUserIds(auth, supabaseAdmin = getSupabaseAdmin()) {
+  if (!auth || isPrivilegedRole(auth.role)) return null;
+  if (!isTeamHeadRole(auth.role)) return [auth.userId];
+
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('reports_to', auth.userId);
+
+  if (error) throw error;
+  return [auth.userId, ...(data || []).map(user => user.id)];
+}
+
+export async function applyUserAccessScope(query, auth, column = 'user_id', supabaseAdmin = getSupabaseAdmin(), additionalColumns = []) {
+  const userIds = await getAccessibleUserIds(auth, supabaseAdmin);
+  if (!userIds) return { query };
+  if (!additionalColumns.length) return { query: query.in(column, userIds) };
+
+  const inList = `(${userIds.join(',')})`;
+  return {
+    query: query.or([column, ...additionalColumns].map(item => `${item}.in.${inList}`).join(','))
+  };
 }
 
 export function hashPassword(password) {

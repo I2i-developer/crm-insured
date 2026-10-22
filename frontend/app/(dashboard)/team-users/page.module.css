@@ -22,7 +22,7 @@
 
 .summaryGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 12px;
 }
@@ -143,6 +143,28 @@
   cursor: not-allowed;
 }
 
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.formActions button {
+  flex: 1;
+}
+
+.formActions .secondaryButton {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.fieldHint {
+  color: #b45309;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .tablePanel {
   overflow: hidden;
 }
@@ -211,7 +233,8 @@
   font-weight: 900;
 }
 
-.deleteBtn {
+.deleteBtn,
+.editBtn {
   width: 32px;
   height: 32px;
   display: inline-flex;
@@ -227,7 +250,15 @@
   font-weight: 900;
 }
 
-.deleteBtn svg {
+.editBtn {
+  margin-right: 6px;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.deleteBtn svg,
+.editBtn svg {
   width: 15px;
   height: 15px;
 }

@@ -154,6 +154,7 @@ export default function DashboardLayout({ children }) {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState(false);
   const [reminders, setReminders] = useState([]);
+  const [systemNotifications, setSystemNotifications] = useState([]);
   const [readReminderIds, setReadReminderIds] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -221,23 +222,39 @@ export default function DashboardLayout({ children }) {
 
     Promise.allSettled([
       api.get('/policies?page=1&limit=1000&sort_by=due_date&sort_order=asc'),
-      api.get('/leads')
+      api.get('/leads'),
+      api.get('/notifications')
     ])
-      .then(([policyResult, leadResult]) => {
+      .then(([policyResult, leadResult, notificationResult]) => {
         if (!active) return;
 
         const policies = policyResult.status === 'fulfilled' ? policyResult.value.policies || [] : [];
         const leads = leadResult.status === 'fulfilled' ? leadResult.value.leads || [] : [];
         const nextReminders = buildReminders(policies, leads);
         setReminders(nextReminders);
+        const inboxNotifications = notificationResult.status === 'fulfilled'
+          ? (notificationResult.value.notifications || []).map(notification => ({
+              id: `system-${notification.id}`,
+              databaseId: notification.id,
+              persisted: true,
+              isRead: notification.is_read,
+              title: notification.title,
+              message: notification.message,
+              meta: new Date(notification.created_at).toLocaleString('en-IN'),
+              href: notification.href || '/dashboard',
+              icon: 'report'
+            }))
+          : [];
+        setSystemNotifications(inboxNotifications);
 
         const toastKey = `crm-reminders:${user.email || user.id || 'user'}:${startOfToday().toISOString().slice(0, 10)}`;
         if (sessionStorage.getItem(toastKey)) return;
 
         sessionStorage.setItem(toastKey, 'shown');
-        if (nextReminders.length > 0) {
+        const attentionCount = nextReminders.length + inboxNotifications.filter(item => !item.isRead).length;
+        if (attentionCount > 0) {
           toast.warning(
-            `${nextReminders.length} reminder${nextReminders.length === 1 ? '' : 's'} need attention. Open the bell for client renewals, overdue, lapsed, payments, and lead follow-ups.`,
+            `${attentionCount} notification${attentionCount === 1 ? '' : 's'} need attention. Open the bell for EOD updates and CRM reminders.`,
             'CRM Reminders'
           );
         } else {
@@ -298,7 +315,19 @@ export default function DashboardLayout({ children }) {
     localStorage.setItem(getReminderReadKey(), JSON.stringify(ids));
   };
 
-  const markReminderAsRead = (id) => {
+  const markReminderAsRead = async (notification) => {
+    if (notification.persisted && !notification.isRead) {
+      setSystemNotifications(current => current.map(item => item.id === notification.id ? { ...item, isRead: true } : item));
+      try {
+        await api.patch('/notifications', { id: notification.databaseId });
+      } catch (error) {
+        setSystemNotifications(current => current.map(item => item.id === notification.id ? { ...item, isRead: false } : item));
+        toast.error(error.message || 'Failed to mark notification as read.');
+      }
+      return;
+    }
+
+    const id = notification.id;
     setReadReminderIds(current => {
       if (current.includes(id)) return current;
       const next = [...current, id];
@@ -307,12 +336,20 @@ export default function DashboardLayout({ children }) {
     });
   };
 
-  const markAllRemindersAsRead = () => {
+  const markAllRemindersAsRead = async () => {
+    const previousSystemNotifications = systemNotifications;
+    setSystemNotifications(current => current.map(item => ({ ...item, isRead: true })));
     setReadReminderIds(current => {
       const next = Array.from(new Set([...current, ...reminders.map(reminder => reminder.id)]));
       saveReadReminderIds(next);
       return next;
     });
+    try {
+      await api.patch('/notifications', { all: true });
+    } catch (error) {
+      setSystemNotifications(previousSystemNotifications);
+      toast.error(error.message || 'Failed to mark all notifications as read.');
+    }
   };
 
   const today = now.toLocaleString('en-IN', {
@@ -327,6 +364,7 @@ export default function DashboardLayout({ children }) {
   const roleLabel = {
     super_admin: 'SuperAdmin',
     admin: 'Admin',
+    team_head: 'Team Head',
     team_member: 'Team Member'
   }[user?.role] || 'Team Member';
   const isSuperAdmin = user?.role === 'super_admin';
@@ -338,6 +376,7 @@ export default function DashboardLayout({ children }) {
     { label: 'Add Policy', description: 'Create a new health policy', href: '/policies/new', keywords: 'new create add policy' },
     { label: 'Import Policies', description: 'Bulk upload CSV or XLSX policies', href: '/policies/import', keywords: 'upload bulk import excel csv' },
     { label: 'Lead Management', description: 'Manage incoming health policy leads', href: '/leads', keywords: 'lead leads pipeline follow up remark' },
+    { label: 'EOD Reports', description: 'Submit and review daily team reports', href: '/eod-reports', keywords: 'eod end of day daily report review team head admin' },
     { label: 'Clients', description: 'Client portfolio and contact records', href: '/clients', keywords: 'customer client contact' },
     { label: 'Upcoming Renewals', description: 'Renewal follow-up queue', href: '/upcoming-renewals', keywords: 'renewal renew expiring upcoming' },
     { label: 'Renew Done', description: 'Completed renewal policies', href: '/renew-done-policies', keywords: 'renew done completed renewal policies' },
@@ -348,7 +387,7 @@ export default function DashboardLayout({ children }) {
       { label: 'Policy Types', description: 'Health policy type settings', href: '/policy-types', keywords: 'configuration policy type settings' }
     ] : []),
     ...(isSuperAdmin ? [
-      { label: 'Team Users', description: 'Create admins and team members', href: '/team-users', keywords: 'user admin team member access role' },
+      { label: 'Team Users', description: 'Manage Admins, Team Heads, and Team Members', href: '/team-users', keywords: 'user admin team head team member hierarchy reporting access role' },
       { label: 'Audit Logs', description: 'Review CRM activity logs', href: '/audit-logs', keywords: 'audit history testing superadmin logs' }
     ] : []),
     { label: 'Account Settings', description: 'Profile picture and account details', href: '/settings', keywords: 'profile avatar account settings user' }
@@ -358,7 +397,11 @@ export default function DashboardLayout({ children }) {
     ? commandItems.filter(item => `${item.label} ${item.description} ${item.keywords}`.toLowerCase().includes(normalizedSearch))
     : commandItems
   ).slice(0, 7);
-  const unreadReminders = reminders.filter(reminder => !readReminderIds.includes(reminder.id));
+  const allNotifications = [...systemNotifications, ...reminders];
+  const isNotificationRead = notification => notification.persisted
+    ? notification.isRead
+    : readReminderIds.includes(notification.id);
+  const unreadReminders = allNotifications.filter(notification => !isNotificationRead(notification));
   const notificationCount = unreadReminders.length;
   const notificationCountLabel = notificationCount > 99 ? '99+' : String(notificationCount);
 
@@ -433,6 +476,10 @@ export default function DashboardLayout({ children }) {
           <Link href="/leads" className={`${styles.navItem} ${pathname === '/leads' ? styles.active : ''}`}>
             <span className={styles.navIcon}><LeadIcon /></span>
             Lead Management
+          </Link>
+          <Link href="/eod-reports" className={`${styles.navItem} ${pathname === '/eod-reports' ? styles.active : ''}`}>
+            <span className={styles.navIcon}><LogIcon /></span>
+            EOD Reports
           </Link>
           {isSuperAdmin && (
             <>
@@ -568,13 +615,13 @@ export default function DashboardLayout({ children }) {
                   <div className={styles.menuHeader}>
                     <div>
                       <h2>Notifications</h2>
-                      <p>Renewal, payment, lapsed, and lead reminders</p>
+                      <p>EOD updates, renewals, payments, and lead reminders</p>
                     </div>
                     <span>{notificationLoading ? 'Loading' : `${notificationCount} unread`}</span>
                   </div>
-                  {reminders.length > 0 && (
+                  {allNotifications.length > 0 && (
                     <div className={styles.notificationToolbar}>
-                      <span>{reminders.length} total reminders</span>
+                      <span>{allNotifications.length} total notifications</span>
                       <button type="button" onClick={markAllRemindersAsRead} disabled={notificationCount === 0}>
                         Mark all read
                       </button>
@@ -583,12 +630,12 @@ export default function DashboardLayout({ children }) {
                   <div className={styles.notificationList}>
                     {notificationLoading ? (
                       <div className={styles.notificationEmpty}>Loading reminders...</div>
-                    ) : reminders.length > 0 ? reminders.map(reminder => (
+                    ) : allNotifications.length > 0 ? allNotifications.map(reminder => (
                       <div
-                        className={`${styles.notificationItem} ${readReminderIds.includes(reminder.id) ? styles.notificationItemRead : ''}`}
+                        className={`${styles.notificationItem} ${isNotificationRead(reminder) ? styles.notificationItemRead : ''}`}
                         key={reminder.id}
                       >
-                        <Link href={reminder.href} className={styles.notificationContent} onClick={() => markReminderAsRead(reminder.id)}>
+                        <Link href={reminder.href} className={styles.notificationContent} onClick={() => markReminderAsRead(reminder)}>
                           <ReminderIcon type={reminder.icon} />
                           <span>
                             <strong>{reminder.title}</strong>
@@ -599,10 +646,10 @@ export default function DashboardLayout({ children }) {
                         <button
                           type="button"
                           className={styles.markReadButton}
-                          onClick={() => markReminderAsRead(reminder.id)}
-                          disabled={readReminderIds.includes(reminder.id)}
+                          onClick={() => markReminderAsRead(reminder)}
+                          disabled={isNotificationRead(reminder)}
                         >
-                          {readReminderIds.includes(reminder.id) ? 'Read' : 'Mark read'}
+                          {isNotificationRead(reminder) ? 'Read' : 'Mark read'}
                         </button>
                       </div>
                     )) : (
@@ -676,6 +723,7 @@ function UserAvatar({ user, fallback, className }) {
 }
 
 function ReminderIcon({ type }) {
+  if (type === 'report') return <LogIcon />;
   if (type === 'payment') return <PaymentIcon />;
   if (type === 'lead') return <LeadIcon />;
   if (type === 'clock') return <ClockIcon />;

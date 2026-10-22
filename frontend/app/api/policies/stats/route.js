@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { getAccessibleUserIds, getUserAccessFromRequest } from '@/lib/server-auth';
 
 export async function GET(request) {
   try {
@@ -13,6 +13,7 @@ export async function GET(request) {
     const policyBucket = searchParams.get('policy_bucket') || '';
     const excludeStatus = searchParams.get('exclude_status') || '';
     const supabaseAdmin = getSupabaseAdmin();
+    const accessibleUserIds = await getAccessibleUserIds(auth, supabaseAdmin);
     const currentYear = new Date().getFullYear();
     const currentYearStart = `${currentYear}-01-01`;
     const currentYearEnd = `${currentYear}-12-31`;
@@ -21,9 +22,7 @@ export async function GET(request) {
         .from('policies')
         .select('id', { count: 'exact', head: true });
 
-      if (!isPrivilegedRole(auth.role)) {
-        query = query.eq('user_id', auth.userId);
-      }
+      if (accessibleUserIds) query = query.in('user_id', accessibleUserIds);
 
       if (policyBucket) {
         query = query.eq('policy_bucket', policyBucket);

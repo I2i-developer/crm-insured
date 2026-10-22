@@ -1,13 +1,8 @@
 import { NextResponse } from 'next/server';
 import { writeAuditLog } from '@/lib/audit';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { applyUserAccessScope, getUserAccessFromRequest } from '@/lib/server-auth';
 import { validateLeadInput } from '@/lib/validation';
-
-function applyLeadAccess(query, auth) {
-  if (isPrivilegedRole(auth.role)) return query;
-  return query.or(`user_id.eq.${auth.userId},assigned_to.eq.${auth.userId}`);
-}
 
 function sortLeadRemarks(lead) {
   return {
@@ -32,7 +27,7 @@ export async function GET(request, { params }) {
       .select('*, lead_remarks(id, user_id, remark, created_at)')
       .eq('id', id);
 
-    query = applyLeadAccess(query, auth);
+    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data, error } = await query.single();
 
@@ -66,7 +61,7 @@ export async function PUT(request, { params }) {
       .update(updates)
       .eq('id', id);
 
-    query = applyLeadAccess(query, auth);
+    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data, error } = await query
       .select('*, lead_remarks(id, user_id, remark, created_at)')
@@ -105,7 +100,7 @@ export async function DELETE(request, { params }) {
       .delete()
       .eq('id', id);
 
-    query = applyLeadAccess(query, auth);
+    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data, error } = await query.select('id, client_name').single();
 

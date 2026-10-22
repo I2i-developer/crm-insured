@@ -46,6 +46,7 @@ export async function POST(request) {
         email: user.email,
         name: user.name,
         role: user.role || 'team_member',
+        reports_to: user.reports_to || '',
         avatar_url: user.avatar_url || '',
         designation: user.designation || ''
       }

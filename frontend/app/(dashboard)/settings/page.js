@@ -107,6 +107,7 @@ export default function SettingsPage() {
   const roleLabel = {
     super_admin: 'SuperAdmin',
     admin: 'Admin',
+    team_head: 'Team Head',
     team_member: 'Team Member'
   }[role] || 'Team Member';
 

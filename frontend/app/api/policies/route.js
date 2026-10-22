@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { writeAuditLog } from '@/lib/audit';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { applyUserAccessScope, getUserAccessFromRequest } from '@/lib/server-auth';
 import { validatePolicyInput } from '@/lib/validation';
 
 export async function GET(request) {
@@ -33,9 +33,7 @@ export async function GET(request) {
       .from('policies')
       .select('*', { count: 'exact' });
 
-    if (!isPrivilegedRole(auth.role)) {
-      queryBuilder = queryBuilder.eq('user_id', auth.userId);
-    }
+    ({ query: queryBuilder } = await applyUserAccessScope(queryBuilder, auth, 'user_id', supabaseAdmin));
 
     if (search) {
       queryBuilder = queryBuilder.ilike('client_name', `%${search}%`);

@@ -1,13 +1,8 @@
 import { NextResponse } from 'next/server';
 import { writeAuditLog } from '@/lib/audit';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { applyUserAccessScope, getUserAccessFromRequest } from '@/lib/server-auth';
 import { validateLeadRemarkInput } from '@/lib/validation';
-
-function applyLeadAccess(query, auth) {
-  if (isPrivilegedRole(auth.role)) return query;
-  return query.or(`user_id.eq.${auth.userId},assigned_to.eq.${auth.userId}`);
-}
 
 export async function POST(request, { params }) {
   try {
@@ -27,7 +22,7 @@ export async function POST(request, { params }) {
       .from('leads')
       .select('id')
       .eq('id', id);
-    leadQuery = applyLeadAccess(leadQuery, auth);
+    ({ query: leadQuery } = await applyUserAccessScope(leadQuery, auth, 'user_id', supabaseAdmin, ['assigned_to']));
 
     const { data: lead, error: leadError } = await leadQuery.single();
     if (leadError || !lead) {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { writeAuditLog } from '@/lib/audit';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { applyUserAccessScope, getUserAccessFromRequest } from '@/lib/server-auth';
 import { validatePolicyInput } from '@/lib/validation';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -64,9 +64,7 @@ export async function GET(request, { params }) {
       .select('*')
       .eq('id', id);
 
-    if (!isPrivilegedRole(auth.role)) {
-      query = query.eq('user_id', auth.userId);
-    }
+    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin));
 
     const { data, error } = await query.single();
 
@@ -104,9 +102,7 @@ export async function PUT(request, { params }) {
       .select('*')
       .eq('id', id);
 
-    if (!isPrivilegedRole(auth.role)) {
-      currentQuery = currentQuery.eq('user_id', auth.userId);
-    }
+    ({ query: currentQuery } = await applyUserAccessScope(currentQuery, auth, 'user_id', supabaseAdmin));
 
     const { data: currentPolicy, error: currentError } = await currentQuery.single();
 
@@ -135,9 +131,7 @@ export async function PUT(request, { params }) {
       .update(updates)
       .eq('id', id);
 
-    if (!isPrivilegedRole(auth.role)) {
-      query = query.eq('user_id', auth.userId);
-    }
+    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin));
 
     const { data, error } = await query.select().single();
 
@@ -178,9 +172,7 @@ export async function DELETE(request, { params }) {
       .delete()
       .eq('id', id);
 
-    if (!isPrivilegedRole(auth.role)) {
-      query = query.eq('user_id', auth.userId);
-    }
+    ({ query } = await applyUserAccessScope(query, auth, 'user_id', supabaseAdmin));
 
     const { data, error } = await query.select('id, policy_number, client_name').single();
 

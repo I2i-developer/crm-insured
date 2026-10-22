@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { writeAuditLog } from '@/lib/audit';
 import { getSupabaseAdmin } from '@/lib/supabase';
-import { getUserAccessFromRequest, isPrivilegedRole } from '@/lib/server-auth';
+import { applyUserAccessScope, getUserAccessFromRequest } from '@/lib/server-auth';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const POLICY_DOCUMENT_BUCKET = 'policy-documents';
@@ -68,9 +68,7 @@ export async function POST(request, { params }) {
       .select('id, user_id, policy_number, client_name')
       .eq('id', id);
 
-    if (!isPrivilegedRole(auth.role)) {
-      policyQuery = policyQuery.eq('user_id', auth.userId);
-    }
+    ({ query: policyQuery } = await applyUserAccessScope(policyQuery, auth, 'user_id', supabaseAdmin));
 
     const { data: policy, error: policyError } = await policyQuery.single();
     if (policyError || !policy) {

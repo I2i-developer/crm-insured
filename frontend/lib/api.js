@@ -51,6 +51,7 @@ export const api = {
   get: (endpoint) => fetchAPI(endpoint, { method: 'GET' }),
   post: (endpoint, body) => fetchAPI(endpoint, { method: 'POST', body: JSON.stringify(body) }),
   put: (endpoint, body) => fetchAPI(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
+  patch: (endpoint, body) => fetchAPI(endpoint, { method: 'PATCH', body: JSON.stringify(body) }),
   delete: (endpoint) => fetchAPI(endpoint, { method: 'DELETE' }),
   upload: (endpoint, formData) => fetchAPI(endpoint, { method: 'POST', body: formData })
 };

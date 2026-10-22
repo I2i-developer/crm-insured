@@ -60,6 +60,7 @@ export const AuthProvider = ({ children }) => {
       email: data.user.email,
       name: data.user.name,
       role: data.user.role || 'team_member',
+      reports_to: data.user.reports_to || '',
       avatar_url: data.user.avatar_url || '',
       designation: data.user.designation || ''
     };
@@ -85,6 +86,7 @@ export const AuthProvider = ({ children }) => {
       email: data.user.email,
       name: data.user.name,
       role: data.user.role || 'team_member',
+      reports_to: data.user.reports_to || '',
       avatar_url: data.user.avatar_url || '',
       designation: data.user.designation || ''
     };

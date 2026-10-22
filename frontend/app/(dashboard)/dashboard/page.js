@@ -212,7 +212,11 @@ export default function DashboardPage() {
       eyebrow: 'System Summary'
     },
     admin: {
-      description: 'Team-head view for monitoring leads, renewals, payment risk, and agent follow-up priorities.',
+      description: 'Organization view for monitoring teams, renewals, payment risk, and EOD execution.',
+      eyebrow: 'Organization Summary'
+    },
+    team_head: {
+      description: 'Team view for your members, renewals, leads, payment risk, and daily execution.',
       eyebrow: 'Team Summary'
     },
     team_member: {
