@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import DatePicker from '@/components/DatePicker';
 import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
 
@@ -266,22 +267,21 @@ export default function DashboardPage() {
           <h2>Card date range</h2>
         </div>
         <div className={styles.dashboardFilters}>
-          <label>
-            <span>From</span>
-            <input
-              type="date"
-              value={dashboardFilters.dateFrom}
-              onChange={event => setDashboardFilters(prev => ({ ...prev, dateFrom: event.target.value }))}
-            />
-          </label>
-          <label>
-            <span>To</span>
-            <input
-              type="date"
-              value={dashboardFilters.dateTo}
-              onChange={event => setDashboardFilters(prev => ({ ...prev, dateTo: event.target.value }))}
-            />
-          </label>
+          <DatePicker
+            label="From"
+            value={dashboardFilters.dateFrom}
+            onChange={value => setDashboardFilters(prev => ({ ...prev, dateFrom: value }))}
+            maxDate={dashboardFilters.dateTo || undefined}
+            compact
+          />
+          <DatePicker
+            label="To"
+            align="end"
+            value={dashboardFilters.dateTo}
+            onChange={value => setDashboardFilters(prev => ({ ...prev, dateTo: value }))}
+            minDate={dashboardFilters.dateFrom || undefined}
+            compact
+          />
           <button
             type="button"
             onClick={() => setDashboardFilters({ dateFrom: '', dateTo: '' })}

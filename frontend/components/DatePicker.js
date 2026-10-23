@@ -23,12 +23,15 @@ function formatDisplay(value) {
   return date ? date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 }
 
-export default function DatePicker({ label, value, onChange, maxDate, placeholder = 'Select date', compact = false, required = false }) {
+export default function DatePicker({ label, value, onChange, minDate, maxDate, placeholder = 'Select date', compact = false, required = false, align = 'start' }) {
   const rootRef = useRef(null);
   const selectedDate = parseDate(value);
-  const maximumDate = parseDate(maxDate) || new Date();
+  const minimumDate = parseDate(minDate);
+  const maximumDate = parseDate(maxDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const [open, setOpen] = useState(false);
-  const [viewDate, setViewDate] = useState(() => selectedDate || maximumDate);
+  const [viewDate, setViewDate] = useState(() => selectedDate || maximumDate || today);
 
   useEffect(() => {
     if (selectedDate) setViewDate(selectedDate);
@@ -53,16 +56,20 @@ export default function DatePicker({ label, value, onChange, maxDate, placeholde
     return cells;
   }, [viewDate]);
 
+  const previousMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1);
   const nextMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
-  const canMoveNext = nextMonth <= maximumDate;
+  const previousMonthEnd = new Date(viewDate.getFullYear(), viewDate.getMonth(), 0);
+  const canMovePrevious = !minimumDate || previousMonthEnd >= minimumDate;
+  const canMoveNext = !maximumDate || nextMonth <= maximumDate;
   const chooseDate = date => {
-    if (!date || date > maximumDate) return;
+    if (!date || (minimumDate && date < minimumDate) || (maximumDate && date > maximumDate)) return;
     onChange(toDateValue(date));
     setOpen(false);
   };
+  const canChooseToday = (!minimumDate || today >= minimumDate) && (!maximumDate || today <= maximumDate);
 
   const picker = (
-    <div className={`${styles.root} ${compact ? styles.compact : ''}`} ref={rootRef}>
+    <div className={`${styles.root} ${compact ? styles.compact : ''} ${align === 'end' ? styles.alignEnd : ''}`} ref={rootRef}>
       <button type="button" className={styles.trigger} onClick={() => setOpen(current => !current)} aria-expanded={open}>
         <CalendarIcon />
         <span className={value ? styles.value : styles.placeholder}>{formatDisplay(value) || placeholder}</span>
@@ -72,17 +79,17 @@ export default function DatePicker({ label, value, onChange, maxDate, placeholde
       {open && (
         <div className={styles.popover} role="dialog" aria-label={label || placeholder}>
           <div className={styles.calendarHeader}>
-            <button type="button" onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))} title="Previous month"><ChevronLeftIcon /></button>
+            <button type="button" onClick={() => canMovePrevious && setViewDate(previousMonth)} disabled={!canMovePrevious} title="Previous month"><ChevronLeftIcon /></button>
             <strong>{viewDate.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</strong>
             <button type="button" onClick={() => canMoveNext && setViewDate(nextMonth)} disabled={!canMoveNext} title="Next month"><ChevronRightIcon /></button>
           </div>
           <div className={styles.weekdays}>{WEEKDAYS.map(day => <span key={day}>{day}</span>)}</div>
           <div className={styles.days}>
             {days.map((date, index) => {
-              if (!date || date > maximumDate) return <span className={styles.emptyDay} key={`empty-${index}`} />;
+              if (!date || (minimumDate && date < minimumDate) || (maximumDate && date > maximumDate)) return <span className={styles.emptyDay} key={`empty-${index}`} />;
               const dateValue = toDateValue(date);
               const isSelected = dateValue === value;
-              const isToday = dateValue === toDateValue(maximumDate);
+              const isToday = dateValue === toDateValue(today);
               return (
                 <button type="button" key={dateValue} className={`${styles.day} ${isSelected ? styles.selectedDay : ''} ${isToday ? styles.today : ''}`} onClick={() => chooseDate(date)} aria-pressed={isSelected}>
                   {date.getDate()}
@@ -91,7 +98,7 @@ export default function DatePicker({ label, value, onChange, maxDate, placeholde
             })}
           </div>
           <div className={styles.calendarFooter}>
-            <button type="button" onClick={() => chooseDate(maximumDate)}>Today</button>
+            {canChooseToday && <button type="button" onClick={() => chooseDate(today)}>Today</button>}
             {!required && value && <button type="button" onClick={() => { onChange(''); setOpen(false); }}>Clear</button>}
           </div>
         </div>

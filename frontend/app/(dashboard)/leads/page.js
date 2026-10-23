@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import DatePicker from '@/components/DatePicker';
 import { LEAD_PRIORITIES, LEAD_STAGES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
 import styles from './page.module.css';
@@ -192,10 +193,11 @@ export default function LeadsPage() {
               Expected premium
               <input type="number" min="0" value={form.expected_premium} onChange={(e) => setForm(prev => ({ ...prev, expected_premium: e.target.value }))} />
             </label>
-            <label>
-              Next follow-up
-              <input type="date" value={form.next_follow_up} onChange={(e) => setForm(prev => ({ ...prev, next_follow_up: e.target.value }))} />
-            </label>
+            <DatePicker
+              label="Next follow-up"
+              value={form.next_follow_up}
+              onChange={value => setForm(prev => ({ ...prev, next_follow_up: value }))}
+            />
           </div>
           <label>
             Notes

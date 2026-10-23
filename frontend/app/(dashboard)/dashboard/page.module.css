@@ -168,7 +168,7 @@
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
 }
 
-.dashboardFilters button {
+.dashboardFilters > button {
   min-height: 36px;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -180,7 +180,7 @@
   cursor: pointer;
 }
 
-.dashboardFilters button:disabled {
+.dashboardFilters > button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }

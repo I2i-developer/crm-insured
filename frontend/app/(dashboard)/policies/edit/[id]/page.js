@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { api } from '@/lib/api';
+import DatePicker from '@/components/DatePicker';
 import { HEALTH_INSURANCE_COMPANIES, HEALTH_POLICY_TYPE, POLICY_TYPES } from '@/lib/healthPolicy';
 import { POLICY_DISCOUNT_TYPES, POLICY_RENEWAL_YEARS, POLICY_STATUSES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
@@ -318,33 +319,30 @@ export default function EditPolicyPage() {
 
           <div className={styles.field}>
             <label>{form.policy_type === 'Travel Insurance' ? 'Policy Expiry Date *' : 'Renewal / Due Date *'}</label>
-            <input
-              type="date"
-              name="due_date"
+            <DatePicker
               value={form.due_date}
-              onChange={handleChange}
+              onChange={value => setForm(prev => ({ ...prev, due_date: value }))}
+              minDate={form.issuance_date || undefined}
               required
             />
           </div>
 
           <div className={styles.field}>
             <label>Issuance Date *</label>
-            <input
-              type="date"
-              name="issuance_date"
+            <DatePicker
               value={form.issuance_date}
-              onChange={handleChange}
+              onChange={value => setForm(prev => ({ ...prev, issuance_date: value }))}
+              maxDate={form.due_date || undefined}
               required
             />
           </div>
 
           <div className={styles.field}>
             <label>Payment Due Date</label>
-            <input
-              type="date"
-              name="payment_due_date"
+            <DatePicker
               value={form.payment_due_date}
-              onChange={handleChange}
+              onChange={value => setForm(prev => ({ ...prev, payment_due_date: value }))}
+              minDate={form.issuance_date || undefined}
             />
           </div>
 

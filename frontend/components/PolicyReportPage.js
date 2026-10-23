@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import DatePicker from '@/components/DatePicker';
 import { HEALTH_POLICY_TYPE, POLICY_TYPES } from '@/lib/healthPolicy';
 import { POLICY_BUCKETS, POLICY_DISCOUNT_TYPES, POLICY_STATUSES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
@@ -479,19 +480,20 @@ export default function PolicyReportPage({
               <option value="issuance">Issuance date</option>
               <option value="payment">Payment due date</option>
             </select>
-            <input
-              className={styles.input}
-              type="date"
+            <DatePicker
+              compact
               value={advancedFilters.dateFrom}
-              onChange={event => setAdvancedFilters(prev => ({ ...prev, dateFrom: event.target.value }))}
-              aria-label="Date from"
+              onChange={value => setAdvancedFilters(prev => ({ ...prev, dateFrom: value }))}
+              maxDate={advancedFilters.dateTo || undefined}
+              placeholder="Date from"
             />
-            <input
-              className={styles.input}
-              type="date"
+            <DatePicker
+              compact
+              align="end"
               value={advancedFilters.dateTo}
-              onChange={event => setAdvancedFilters(prev => ({ ...prev, dateTo: event.target.value }))}
-              aria-label="Date to"
+              onChange={value => setAdvancedFilters(prev => ({ ...prev, dateTo: value }))}
+              minDate={advancedFilters.dateFrom || undefined}
+              placeholder="Date to"
             />
             <input
               className={styles.input}

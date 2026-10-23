@@ -234,8 +234,8 @@ export default function EodReportsPage() {
                 <option value="">All submitters</option>{submitters.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
               </select>
             )}
-            <DatePicker compact value={filters.date_from} onChange={value => setFilters(current => ({ ...current, date_from: value }))} maxDate={localDateValue()} placeholder="From date" />
-            <DatePicker compact value={filters.date_to} onChange={value => setFilters(current => ({ ...current, date_to: value }))} maxDate={localDateValue()} placeholder="To date" />
+            <DatePicker compact value={filters.date_from} onChange={value => setFilters(current => ({ ...current, date_from: value }))} maxDate={filters.date_to || localDateValue()} placeholder="From date" />
+            <DatePicker compact align="end" value={filters.date_to} onChange={value => setFilters(current => ({ ...current, date_to: value }))} minDate={filters.date_from || undefined} maxDate={localDateValue()} placeholder="To date" />
           </div>
         </div>
 
@@ -284,10 +284,10 @@ export default function EodReportsPage() {
 function SummaryCard({ label, value, tone, icon }) { return <div className={`${styles.summaryCard} ${styles[tone]}`}><span className={styles.summaryIcon}>{icon}</span><div><span>{label}</span><strong>{value}</strong></div></div>; }
 function DetailBlock({ title, value }) { return <div className={styles.detailBlock}><strong>{title}</strong><p>{value || 'No update provided.'}</p></div>; }
 function Metric({ label, value }) { return <div className={styles.metric}><strong>{value || 0}</strong><span>{label}</span></div>; }
-function RefreshIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 11a8 8 0 1 0 2 5"/><path d="M20 4v7h-7"/></svg>; }
-function ReportIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>; }
-function ClockIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>; }
-function CheckIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>; }
-function ReturnIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 7-5 5 5 5"/><path d="M4 12h10a6 6 0 0 1 6 6"/></svg>; }
-function EditIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>; }
-function DeleteIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v6M14 11v6"/></svg>; }
+function RefreshIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 11a8 8 0 1 0 2 5" /><path d="M20 4v7h-7" /></svg>; }
+function ReportIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 3h9l4 4v14H6z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg>; }
+function ClockIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>; }
+function CheckIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="m8 12 3 3 5-6" /></svg>; }
+function ReturnIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 7-5 5 5 5" /><path d="M4 12h10a6 6 0 0 1 6 6" /></svg>; }
+function EditIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></svg>; }
+function DeleteIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v6M14 11v6" /></svg>; }

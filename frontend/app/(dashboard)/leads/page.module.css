@@ -169,7 +169,7 @@
   gap: 10px;
 }
 
-.formPanel button,
+.formPanel > button,
 .remarkInput button,
 .deleteBtn {
   min-height: 38px;
@@ -180,12 +180,12 @@
   font-weight: 800;
 }
 
-.formPanel button {
+.formPanel > button {
   background: var(--primary);
   color: #fff;
 }
 
-.formPanel button:disabled,
+.formPanel > button:disabled,
 .remarkInput button:disabled {
   opacity: 0.55;
   cursor: not-allowed;

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import DatePicker from '@/components/DatePicker';
 import { HEALTH_INSURANCE_COMPANIES, HEALTH_POLICY_TYPE } from '@/lib/healthPolicy';
 import { POLICY_STATUSES } from '@/lib/validation';
 import { useToast } from '@/components/ToastProvider';
@@ -212,17 +213,20 @@ export default function PoliciesPage() {
             <option value="">All Statuses</option>
             {POLICY_STATUSES.filter(status => status !== RENEW_DONE_STATUS).map(status => <option key={status} value={status}>{status}</option>)}
           </select>
-          <input
-            type="date"
+          <DatePicker
+            compact
             value={filters.due_date_from}
-            onChange={(e) => handleFilterChange('due_date_from', e.target.value)}
-            className={styles.dateInput}
+            onChange={value => handleFilterChange('due_date_from', value)}
+            maxDate={filters.due_date_to || undefined}
+            placeholder="Due date from"
           />
-          <input
-            type="date"
+          <DatePicker
+            compact
+            align="end"
             value={filters.due_date_to}
-            onChange={(e) => handleFilterChange('due_date_to', e.target.value)}
-            className={styles.dateInput}
+            onChange={value => handleFilterChange('due_date_to', value)}
+            minDate={filters.due_date_from || undefined}
+            placeholder="Due date to"
           />
         </div>
       </div>
