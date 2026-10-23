@@ -134,3 +134,83 @@
 .emptyState {
   font-size: 13px;
 }
+
+.reportForm input,
+.reportForm textarea,
+.reviewBox textarea {
+  font-weight: 400;
+}
+
+.reportForm input::placeholder,
+.reportForm textarea::placeholder,
+.reviewBox textarea::placeholder {
+  color: #98a2b3;
+  font-weight: 400;
+  opacity: 1;
+}
+
+.submitActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.submitActions button {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.activityRow .cancelButton {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #344054;
+}
+
+.detailActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.iconAction {
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  background: #eff6ff;
+  color: #2563eb;
+  cursor: pointer;
+}
+
+.iconAction svg {
+  width: 15px;
+  height: 15px;
+}
+
+.deleteAction {
+  border-color: #fecaca;
+  background: #fff7f7;
+  color: #dc2626;
+}
+
+.detailGrid > :only-child {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .submitActions {
+    width: 100%;
+  }
+
+  .detailHeader {
+    flex-direction: column;
+  }
+
+  .detailActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}

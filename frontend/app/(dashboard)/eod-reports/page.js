@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ToastProvider';
+import DatePicker from '@/components/DatePicker';
 import styles from './page.module.css';
 
 const emptyForm = {
@@ -50,6 +51,8 @@ export default function EodReportsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const [editingId, setEditingId] = useState('');
+  const [deletingId, setDeletingId] = useState('');
 
   useEffect(() => {
     setUser(JSON.parse(localStorage.getItem('user') || 'null'));
@@ -99,9 +102,15 @@ export default function EodReportsPage() {
     event.preventDefault();
     setSaving(true);
     try {
-      await api.post('/eod-reports', form);
-      toast.success('EOD report submitted to all Admins for review.');
+      if (editingId) {
+        await api.put('/eod-reports', { ...form, id: editingId });
+        toast.success('EOD report updated and sent to all Admins for review.');
+      } else {
+        await api.post('/eod-reports', form);
+        toast.success('EOD report submitted to all Admins for review.');
+      }
       setForm({ ...emptyForm, report_date: localDateValue() });
+      setEditingId('');
       await fetchReports();
     } catch (error) {
       toast.error(error.message || 'Failed to submit EOD report.');
@@ -111,6 +120,7 @@ export default function EodReportsPage() {
   };
 
   const reviseReport = (report) => {
+    setEditingId(report.id);
     setForm({
       report_date: report.report_date,
       work_summary: report.work_summary || '',
@@ -122,6 +132,36 @@ export default function EodReportsPage() {
       renewals_completed: report.renewals_completed || 0
     });
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingId('');
+    setForm({ ...emptyForm, report_date: localDateValue() });
+  };
+
+  const deleteReport = async report => {
+    const permanent = canReview;
+    const confirmed = await toast.confirm({
+      title: permanent ? 'Permanently delete EOD report?' : 'Remove EOD report from your view?',
+      message: permanent
+        ? `This will permanently delete ${report.submitter?.name || report.submitter_name}'s report for ${formatDate(report.report_date)}. This cannot be undone.`
+        : `The report for ${formatDate(report.report_date)} will be hidden from your account but retained for Admin review.`,
+      confirmLabel: permanent ? 'Delete permanently' : 'Remove report'
+    });
+    if (!confirmed) return;
+
+    setDeletingId(report.id);
+    try {
+      const data = await api.delete(`/eod-reports?id=${encodeURIComponent(report.id)}`);
+      toast.success(data.message);
+      setSelected(null);
+      if (editingId === report.id) cancelEdit();
+      await fetchReports();
+    } catch (error) {
+      toast.error(error.message || 'Failed to delete EOD report.');
+    } finally {
+      setDeletingId('');
+    }
   };
 
   const reviewReport = async (status) => {
@@ -161,20 +201,23 @@ export default function EodReportsPage() {
       {canSubmit && (
         <form className={styles.reportForm} onSubmit={submitReport}>
           <div className={styles.panelHeader}>
-            <div><h2>Submit Daily Report</h2><p>One report per working day. Reports can be resubmitted until approved.</p></div>
-            <label className={styles.dateField}>Report date<input type="date" name="report_date" max={localDateValue()} value={form.report_date} onChange={handleFormChange} required /></label>
+            <div><h2>{editingId ? 'Edit Daily Report' : 'Submit Daily Report'}</h2><p>Only the date and work summary are required. Reports are locked after approval.</p></div>
+            <div className={styles.dateField}><DatePicker label="Report date" value={form.report_date} onChange={value => setForm(current => ({ ...current, report_date: value }))} maxDate={localDateValue()} required /></div>
           </div>
           <div className={styles.formGrid}>
             <label className={styles.wideField}>Work summary<textarea name="work_summary" value={form.work_summary} onChange={handleFormChange} rows="4" placeholder="What was completed today? Include important client, policy, and follow-up activity." required /></label>
             <label>Key achievements<textarea name="achievements" value={form.achievements} onChange={handleFormChange} rows="3" placeholder="Wins, closures, or progress made" /></label>
             <label>Challenges or blockers<textarea name="challenges" value={form.challenges} onChange={handleFormChange} rows="3" placeholder="Items requiring support or escalation" /></label>
-            <label className={styles.wideField}>Next working-day plan<textarea name="next_day_plan" value={form.next_day_plan} onChange={handleFormChange} rows="3" placeholder="Priority actions planned for the next working day" required /></label>
+            <label className={styles.wideField}>Next working-day plan<textarea name="next_day_plan" value={form.next_day_plan} onChange={handleFormChange} rows="3" placeholder="Priority actions planned for the next working day" /></label>
           </div>
           <div className={styles.activityRow}>
             <label>Leads contacted<input type="number" min="0" name="leads_contacted" value={form.leads_contacted} onChange={handleFormChange} /></label>
             <label>Policies closed<input type="number" min="0" name="policies_closed" value={form.policies_closed} onChange={handleFormChange} /></label>
             <label>Renewals completed<input type="number" min="0" name="renewals_completed" value={form.renewals_completed} onChange={handleFormChange} /></label>
-            <button type="submit" disabled={saving}>{saving ? 'Submitting...' : 'Submit EOD Report'}</button>
+            <div className={styles.submitActions}>
+              {editingId && <button type="button" className={styles.cancelButton} onClick={cancelEdit}>Cancel</button>}
+              <button type="submit" disabled={saving}>{saving ? 'Saving...' : editingId ? 'Save Changes' : 'Submit EOD Report'}</button>
+            </div>
           </div>
         </form>
       )}
@@ -191,8 +234,8 @@ export default function EodReportsPage() {
                 <option value="">All submitters</option>{submitters.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
               </select>
             )}
-            <input type="date" value={filters.date_from} onChange={event => setFilters(current => ({ ...current, date_from: event.target.value }))} title="From date" />
-            <input type="date" value={filters.date_to} onChange={event => setFilters(current => ({ ...current, date_to: event.target.value }))} title="To date" />
+            <DatePicker compact value={filters.date_from} onChange={value => setFilters(current => ({ ...current, date_from: value }))} maxDate={localDateValue()} placeholder="From date" />
+            <DatePicker compact value={filters.date_to} onChange={value => setFilters(current => ({ ...current, date_to: value }))} maxDate={localDateValue()} placeholder="To date" />
           </div>
         </div>
 
@@ -211,15 +254,18 @@ export default function EodReportsPage() {
             {!selected ? <div className={styles.emptyState}>Select a report to view its details.</div> : (
               <>
                 <div className={styles.detailHeader}>
-                  <div><span>{formatDate(selected.report_date)}</span><h3>{selected.submitter?.name || selected.submitter_name}</h3><p>{roleLabel(selected.role_at_submission)} · Submitted {new Date(selected.submitted_at).toLocaleString('en-IN')}</p></div>
-                  <span className={`${styles.statusPill} ${styles[selected.status]}`}>{statusLabels[selected.status]}</span>
+                  <div><span>{formatDate(selected.report_date)}</span><h3>{selected.submitter?.name || selected.submitter_name}</h3><p>{roleLabel(selected.role_at_submission)} - Submitted {new Date(selected.submitted_at).toLocaleString('en-IN')}</p></div>
+                  <div className={styles.detailActions}>
+                    <span className={`${styles.statusPill} ${styles[selected.status]}`}>{statusLabels[selected.status]}</span>
+                    {canSubmit && selected.user_id === user?.id && selected.status !== 'reviewed' && <button type="button" className={styles.iconAction} onClick={() => reviseReport(selected)} title="Edit EOD report"><EditIcon /></button>}
+                    {(canReview || (canSubmit && selected.user_id === user?.id)) && <button type="button" className={`${styles.iconAction} ${styles.deleteAction}`} onClick={() => deleteReport(selected)} disabled={deletingId === selected.id} title={canReview ? 'Permanently delete EOD report' : 'Remove EOD report'}>{deletingId === selected.id ? '...' : <DeleteIcon />}</button>}
+                  </div>
                 </div>
                 <DetailBlock title="Work Summary" value={selected.work_summary} />
-                <div className={styles.detailGrid}><DetailBlock title="Key Achievements" value={selected.achievements} /><DetailBlock title="Challenges / Blockers" value={selected.challenges} /></div>
-                <DetailBlock title="Next Working-Day Plan" value={selected.next_day_plan} />
-                <div className={styles.numberGrid}><Metric label="Leads Contacted" value={selected.leads_contacted} /><Metric label="Policies Closed" value={selected.policies_closed} /><Metric label="Renewals Completed" value={selected.renewals_completed} /></div>
+                {(selected.achievements || selected.challenges) && <div className={styles.detailGrid}>{selected.achievements && <DetailBlock title="Key Achievements" value={selected.achievements} />}{selected.challenges && <DetailBlock title="Challenges / Blockers" value={selected.challenges} />}</div>}
+                {selected.next_day_plan && <DetailBlock title="Next Working-Day Plan" value={selected.next_day_plan} />}
+                {(selected.leads_contacted > 0 || selected.policies_closed > 0 || selected.renewals_completed > 0) && <div className={styles.numberGrid}>{selected.leads_contacted > 0 && <Metric label="Leads Contacted" value={selected.leads_contacted} />}{selected.policies_closed > 0 && <Metric label="Policies Closed" value={selected.policies_closed} />}{selected.renewals_completed > 0 && <Metric label="Renewals Completed" value={selected.renewals_completed} />}</div>}
                 {selected.reviewer_notes && <div className={styles.reviewNote}><strong>Admin review note</strong><p>{selected.reviewer_notes}</p></div>}
-                {canSubmit && selected.user_id === user?.id && selected.status === 'needs_changes' && <button type="button" className={styles.reviseButton} onClick={() => reviseReport(selected)}>Revise Report</button>}
                 {canReview && selected.status !== 'reviewed' && (
                   <div className={styles.reviewBox}>
                     <label>Review notes<textarea rows="3" value={reviewNotes} onChange={event => setReviewNotes(event.target.value)} placeholder="Add feedback or explain requested changes" /></label>
@@ -243,3 +289,5 @@ function ReportIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="curr
 function ClockIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>; }
 function CheckIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>; }
 function ReturnIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 7-5 5 5 5"/><path d="M4 12h10a6 6 0 0 1 6 6"/></svg>; }
+function EditIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>; }
+function DeleteIcon() { return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6M10 11v6M14 11v6"/></svg>; }

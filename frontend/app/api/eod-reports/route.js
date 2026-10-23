@@ -57,7 +57,11 @@ export async function GET(request) {
       .limit(250);
 
     const canReview = canReviewEodReports(auth.role);
-    if (!canReview) query = query.eq('user_id', auth.userId);
+    if (!canReview) {
+      query = query
+        .eq('user_id', auth.userId)
+        .is('hidden_by_submitter_at', null);
+    }
     if (status && REPORT_STATUSES.has(status)) query = query.eq('status', status);
     if (dateFrom) query = query.gte('report_date', dateFrom);
     if (dateTo) query = query.lte('report_date', dateTo);
@@ -97,7 +101,6 @@ export async function POST(request) {
     if (!reportDate) errors.push('Report date is required');
     if (reportDate && reportDate > todayInIndia()) errors.push('EOD report date cannot be in the future');
     if (!workSummary) errors.push('Work summary is required');
-    if (!nextDayPlan) errors.push('Next working-day plan is required');
     if (errors.length) return NextResponse.json({ error: errors.join(', ') }, { status: 400 });
 
     const supabaseAdmin = getSupabaseAdmin();
@@ -129,6 +132,7 @@ export async function POST(request) {
       reviewed_by: null,
       reviewer_notes: null,
       reviewed_at: null,
+      hidden_by_submitter_at: null,
       submitted_at: new Date().toISOString()
     };
 
@@ -185,6 +189,160 @@ export async function POST(request) {
   } catch (error) {
     console.error('Submit EOD report error:', error);
     return NextResponse.json({ error: 'Failed to submit EOD report' }, { status: 500 });
+  }
+}
+
+export async function PUT(request) {
+  try {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!canSubmitEodReport(auth.role)) {
+      return NextResponse.json({ error: 'Only Team Heads and Team Members can edit their EOD reports' }, { status: 403 });
+    }
+
+    const input = await request.json();
+    const id = cleanString(input.id, 80);
+    const reportDate = dateOnly(input.report_date);
+    const workSummary = cleanString(input.work_summary, 5000);
+    const achievements = cleanString(input.achievements, 3000);
+    const challenges = cleanString(input.challenges, 3000);
+    const nextDayPlan = cleanString(input.next_day_plan, 3000);
+    const errors = [];
+    const leadsContacted = nonNegativeInteger(input.leads_contacted, 'Leads contacted', errors);
+    const policiesClosed = nonNegativeInteger(input.policies_closed, 'Policies closed', errors);
+    const renewalsCompleted = nonNegativeInteger(input.renewals_completed, 'Renewals completed', errors);
+
+    if (!UUID_PATTERN.test(id)) errors.push('Valid report is required');
+    if (!reportDate) errors.push('Report date is required');
+    if (reportDate && reportDate > todayInIndia()) errors.push('EOD report date cannot be in the future');
+    if (!workSummary) errors.push('Work summary is required');
+    if (errors.length) return NextResponse.json({ error: errors.join(', ') }, { status: 400 });
+
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: currentReport, error: currentError } = await supabaseAdmin
+      .from('eod_reports')
+      .select('id, status')
+      .eq('id', id)
+      .eq('user_id', auth.userId)
+      .single();
+
+    if (currentError || !currentReport) return NextResponse.json({ error: 'EOD report not found' }, { status: 404 });
+    if (currentReport.status === 'reviewed') {
+      return NextResponse.json({ error: 'Reviewed EOD reports are locked and cannot be edited' }, { status: 409 });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('eod_reports')
+      .update({
+        report_date: reportDate,
+        work_summary: workSummary,
+        achievements: achievements || null,
+        challenges: challenges || null,
+        next_day_plan: nextDayPlan || null,
+        leads_contacted: leadsContacted,
+        policies_closed: policiesClosed,
+        renewals_completed: renewalsCompleted,
+        status: 'submitted',
+        reviewed_by: null,
+        reviewer_notes: null,
+        reviewed_at: null,
+        hidden_by_submitter_at: null,
+        submitted_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .eq('user_id', auth.userId)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') return NextResponse.json({ error: 'An EOD report already exists for this date' }, { status: 409 });
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    const { data: admins } = await supabaseAdmin.from('users').select('id').eq('role', 'admin');
+    if ((admins || []).length > 0) {
+      await supabaseAdmin.from('user_notifications').upsert(admins.map(admin => ({
+        recipient_user_id: admin.id,
+        actor_user_id: auth.userId,
+        notification_type: 'eod_submitted',
+        title: 'EOD report updated',
+        message: `${auth.name || auth.email || 'A team user'} updated the EOD report for ${reportDate}.`,
+        href: '/eod-reports',
+        entity_id: data.id,
+        is_read: false,
+        read_at: null,
+        created_at: new Date().toISOString()
+      })), { onConflict: 'recipient_user_id,notification_type,entity_id' });
+    }
+
+    await writeAuditLog(request, auth, {
+      action: 'eod_report.update',
+      entityType: 'eod_report',
+      entityId: data.id,
+      summary: `Updated EOD report for ${reportDate}`,
+      metadata: { report_date: reportDate }
+    });
+
+    return NextResponse.json({ message: 'EOD report updated and sent to Admins for review', report: data });
+  } catch (error) {
+    console.error('Update EOD report error:', error);
+    return NextResponse.json({ error: 'Failed to update EOD report' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request) {
+  try {
+    const auth = await getUserAccessFromRequest(request);
+    if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { searchParams } = new URL(request.url);
+    const id = cleanString(searchParams.get('id'), 80);
+    if (!UUID_PATTERN.test(id)) return NextResponse.json({ error: 'Valid report is required' }, { status: 400 });
+
+    const supabaseAdmin = getSupabaseAdmin();
+    if (canReviewEodReports(auth.role)) {
+      const { data: report, error: reportError } = await supabaseAdmin
+        .from('eod_reports')
+        .select('id, report_date, submitter_name')
+        .eq('id', id)
+        .single();
+      if (reportError || !report) return NextResponse.json({ error: 'EOD report not found' }, { status: 404 });
+
+      await supabaseAdmin.from('user_notifications').delete().eq('entity_id', id);
+      const { error } = await supabaseAdmin.from('eod_reports').delete().eq('id', id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+      await writeAuditLog(request, auth, {
+        action: 'eod_report.delete_permanent',
+        entityType: 'eod_report',
+        entityId: id,
+        summary: `Permanently deleted ${report.submitter_name}'s EOD report for ${report.report_date}`,
+        metadata: { report_date: report.report_date, submitter_name: report.submitter_name }
+      });
+      return NextResponse.json({ message: 'EOD report permanently deleted' });
+    }
+
+    if (!canSubmitEodReport(auth.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const { data, error } = await supabaseAdmin
+      .from('eod_reports')
+      .update({ hidden_by_submitter_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('user_id', auth.userId)
+      .select('id, report_date')
+      .single();
+
+    if (error || !data) return NextResponse.json({ error: 'EOD report not found' }, { status: 404 });
+    await writeAuditLog(request, auth, {
+      action: 'eod_report.hide',
+      entityType: 'eod_report',
+      entityId: data.id,
+      summary: `Hid own EOD report for ${data.report_date}`,
+      metadata: { report_date: data.report_date }
+    });
+    return NextResponse.json({ message: 'EOD report removed from your view. Admins can still access it.' });
+  } catch (error) {
+    console.error('Delete EOD report error:', error);
+    return NextResponse.json({ error: 'Failed to delete EOD report' }, { status: 500 });
   }
 }
 
